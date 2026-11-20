@@ -5,6 +5,7 @@ import { execSync } from "node:child_process";
 import { Rng } from "../src/core/rng.js";
 import { stateHash } from "../src/core/state-hash.js";
 import { validateWorldManifest, worldToSim } from "../src/core/worldforge.js";
+import { isSafeGlbUri, glbAssets } from "../src/core/assets.js";
 import { createInitialState, step, simulate, SEED } from "../games/star-fishing/fishing.js";
 
 let failures = 0;
@@ -27,11 +28,46 @@ const bad = JSON.parse(JSON.stringify(manifest));
 bad.npcs[0].entityId = "ent-does-not-exist";
 check("fishing manifest rejects bad npc ref", validateWorldManifest(bad).valid === false);
 
+check("fishing world has trophies + glb npc asset",
+  (world.trophies || []).length === 1 && world.npcs.find((n) => n.id === "fish-5")?.assetId === "star-fish",
+  `trophies=${(world.trophies || []).length} fish-5 asset=${world.npcs.find((n) => n.id === "fish-5")?.assetId}`);
+
+const badUri = JSON.parse(JSON.stringify(manifest));
+badUri.assets.find((a) => a.id === "star-fish").uri = "glb:../evil.glb";
+check("manifest rejects parent-traversal glb uri", validateWorldManifest(badUri).valid === false);
+const extUri = JSON.parse(JSON.stringify(manifest));
+extUri.assets.find((a) => a.id === "star-fish").uri = "https://example.com/fish.glb";
+check("manifest rejects external glb uri", validateWorldManifest(extUri).valid === false);
+const supuli = JSON.parse(fs.readFileSync(new URL("../games/supuli/world.json", import.meta.url), "utf8"));
+check("supuli manifest still valid under asset-uri rule", validateWorldManifest(supuli).valid === true);
+check("glbAssets lists 2", glbAssets(manifest).length === 2);
+check("isSafeGlbUri cases",
+  isSafeGlbUri("glb:assets/models/star-fish.glb")
+  && !isSafeGlbUri("glb:../x.glb") && !isSafeGlbUri("glb:/abs/x.glb")
+  && !isSafeGlbUri("https://x/y.glb") && !isSafeGlbUri("builtin:fish"));
+for (const f of ["assets/models/star-fish.glb", "assets/models/star-trophy.glb"]) {
+  const buf = fs.readFileSync(new URL(`../games/star-fishing/${f}`, import.meta.url));
+  check(`glb valid ${f}`, buf.readUInt32LE(0) === 0x46546c67 && buf.readUInt32LE(4) === 2, `${buf.length} bytes`);
+}
+
 for (const f of ["games/star-fishing/fishing.js", "src/core/worldforge.js"]) {
   try {
     execSync(`node --check ${f}`, { cwd: new URL("..", import.meta.url).pathname, stdio: "pipe" });
     check(`syntax ${f}`, true);
   } catch { check(`syntax ${f}`, false); }
+}
+
+// Syntax-check the render modules without linking: they import bare 'three',
+// which only exists in the browser importmap. vm.SourceTextModule parses
+// without resolving imports (needs --experimental-vm-modules, see package.json).
+import vm from "node:vm";
+for (const f of ["src/render/asset-loader.js", "src/render/vendor/GLTFLoader.js", "src/render/vendor/BufferGeometryUtils.js"]) {
+  try {
+    new vm.SourceTextModule(fs.readFileSync(new URL(`../${f}`, import.meta.url), "utf8"));
+    check(`syntax ${f}`, true);
+  } catch (e) {
+    check(`syntax ${f}`, false, String(e).slice(0, 200));
+  }
 }
 
 // Determinism.

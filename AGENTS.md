@@ -36,6 +36,12 @@
 - 새 게임은 `games/<game>/world.json` (WorldForge 0.1 매니페스트) + 심 + `index.html` + `tools/check-<game>.mjs` + `package.json` 스크립트(`check:<game>`)로 구성한다. 저장 키는 게임마다 별도(`aldol-engine.<game>-m2.save.v1`).
 - `worldforge.js`를 바꿀 때는 양쪽 게임 체크(`npm run check` + `npm run check:fishing`)를 둘 다 돌린다. 어댑터에 게임별 필드를 추가할 때는 기본값(null/빈 배열)을 두고, 기존 게임이 안 쓰는 필드는 건드리지 않는다.
 
+## 에셋 (GLB 파이프라인)
+- 매니페스트 에셋 URI는 `builtin:<이름>` 또는 `glb:<게임 폴더 안 상대 경로>.glb`만 된다. 상위 폴더(`..`)·절대 경로·외부 URL은 검증이 거부한다.
+- GLB는 Blender 스크립트(`tools/blender/make-star-fishing-assets.py`, `npm run assets:fishing`)로 만들고 `games/<game>/assets/models/`에 둔다. 로더는 `src/render/asset-loader.js` (three 0.160.0 GLTFLoader 벤더링, `src/render/vendor/` — CDN 의존 없음).
+- GLB 로딩은 렌더러에서만 일어난다. 심은 건드리지 않는다(결정성 유지). 로드 실패 시 원시(primitive) 폴백을 쓰고 게임은 그대로 시작한다.
+- 새 게임이 GLB를 쓰면 `tools/check-<game>.mjs`에 매직바이트 검증 + 프로브 훅(`assets.loaded/failed`) 확인을 넣는다.
+
 ## AI 최소 집합 (M1)
 - FSM 4상태: 순찰(patrol) · 추격(chase) · 도망(flee) · 처치됨(defeated, 10초 뒤 집에서 리스폰). 전이 조건은 `src/core/sim.js`에 표로 적는다.
 - 스티어링 seek/flee/wander + arrive.

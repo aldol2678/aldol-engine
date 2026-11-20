@@ -41,6 +41,14 @@ export function validateWorldManifest(input) {
   for (const name of lists) errors.push(...dupErrors(name, input[name]));
 
   const assetIds = new Set(input.assets.map((a) => a.id));
+  const URI_RE = /^(builtin|glb):[A-Za-z0-9._/-]+$/;
+  input.assets.forEach((a, i) => {
+    if (typeof a.uri !== "string" || !URI_RE.test(a.uri)) {
+      errors.push({ code: "E_ASSET_URI", path: `assets[${i}].uri`, detail: String(a.uri) });
+    } else if (a.uri.startsWith("glb:") && (!a.uri.endsWith(".glb") || a.uri.includes("..") || a.uri.slice(4).startsWith("/"))) {
+      errors.push({ code: "E_ASSET_URI_UNSAFE", path: `assets[${i}].uri`, detail: a.uri });
+    }
+  });
   const zoneIds = new Set(input.zones.map((z) => z.id));
   const placeIds = new Set(input.places.map((p) => p.id));
   const entityIds = new Set(input.entities.map((e) => e.id));
@@ -128,6 +136,9 @@ export function worldToSim(world) {
   const scarecrows = world.entities
     .filter((e) => e.type === "entity.scarecrow" && e.enabled !== false)
     .map((e) => ({ id: e.id, ...toSim(e.transform.position) }));
+  const trophies = world.entities
+    .filter((e) => e.type === "entity.trophy" && e.enabled !== false)
+    .map((e) => ({ id: e.id, assetId: e.assetId || null, height: e.transform.position[1] ?? 0, ...toSim(e.transform.position) }));
   const reeds = world.entities
     .filter((e) => e.type === "entity.reed" && e.enabled !== false)
     .map((e) => ({ id: e.id, ...toSim(e.transform.position) }));
@@ -149,6 +160,7 @@ export function worldToSim(world) {
       sight: n.behavior?.params?.sight ?? 6,
       damage: n.behavior?.params?.damage ?? 0,
       params: n.behavior?.params ?? {},
+      assetId: (ent && ent.assetId) || null,
     };
   });
 
@@ -165,5 +177,5 @@ export function worldToSim(world) {
   const placeMap = {};
   for (const p of world.places) placeMap[p.id] = toSim(p.position);
 
-  return { worldId: world.world.id, bounds: { minX, maxX, minY, maxY }, waypoints, edges, houses, trees, shards, crops, herbs, scarecrows, reeds, npcs, spawn, quests, combat, fishing, places: placeMap };
+  return { worldId: world.world.id, bounds: { minX, maxX, minY, maxY }, waypoints, edges, houses, trees, shards, crops, herbs, scarecrows, trophies, reeds, npcs, spawn, quests, combat, fishing, places: placeMap };
 }
