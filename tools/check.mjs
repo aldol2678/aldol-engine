@@ -7,6 +7,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { simulate, findPath, createInitialState, step, DEFAULT_WORLD } from "../src/core/sim.js";
 import { validateWorldManifest, worldToSim } from "../src/core/worldforge.js";
+import { scheduleVoice, VOICES, BGM_CHORDS, BGM_CHORD_SECONDS } from "../src/core/audio.js";
 import { Rng } from "../src/core/rng.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -79,6 +80,42 @@ const chase = simulate("supuli-m1", 600, { dx: 1, dy: 1 }, world);
 check("npc leaves patrol or chases", ["patrol", "chase", "flee"].includes(chase.state.npcs[0].state), `npc=${chase.state.npcs[0].state}`);
 check("A* path exists 0->2", Array.isArray(findPath(0, 2, world.edges, world.waypoints)) && findPath(0, 2, world.edges, world.waypoints)[0] === 0,
   `path=${JSON.stringify(findPath(0, 2, world.edges, world.waypoints))}`);
+
+// 3a. Navmesh: houses block, spawn is open, paths detour, NPCs never enter blocked cells.
+const nav = world.navmesh;
+check("navmesh built", nav && nav.cols > 0 && nav.rows > 0, `cols=${nav?.cols} rows=${nav?.rows} cell=${nav?.cellSize}`);
+const house1 = world.houses[0]; // (-4, -1)
+check("house center is blocked", nav.isWalkable(house1.x, house1.y) === false, `house=(${house1.x}, ${house1.y})`);
+check("spawn is walkable", nav.isWalkable(world.spawn.x, world.spawn.y) === true);
+check("direct line through a house is blocked", nav.lineClear(house1.x - 2, house1.y, house1.x + 2, house1.y) === false);
+const detour = nav.findPath({ x: house1.x - 2, y: house1.y }, { x: house1.x + 2, y: house1.y });
+const detourFull = [{ x: house1.x - 2, y: house1.y }, ...(detour || [])];
+const detourLen = detourFull.reduce((s, p, i, a) => s + (i ? Math.hypot(p.x - a[i - 1].x, p.y - a[i - 1].y) : 0), 0);
+check("navmesh path detours around a house", Array.isArray(detour) && detour.length > 0
+  && detour.every((p) => nav.isWalkable(p.x, p.y)) && detourLen > 4,
+  `points=${detour?.length} len=${detourLen.toFixed(2)}`);
+check("navmesh path is deterministic",
+  JSON.stringify(nav.findPath({ x: house1.x - 2, y: house1.y }, { x: house1.x + 2, y: house1.y })) === JSON.stringify(detour));
+// NPC chase around a house: boar 2 units west of house-1, player 2 units east.
+let chaseState = createInitialState("supuli-m1", world);
+chaseState.player.x = house1.x + 2;
+chaseState.player.y = house1.y;
+chaseState.npcs.find((n) => n.id === "boar-1").x = house1.x - 2;
+chaseState.npcs.find((n) => n.id === "boar-1").y = house1.y;
+{
+  const rng = new Rng("supuli-m1").fork("ai:patrol");
+  let reached = false;
+  let enteredBlocked = false;
+  for (let f = 0; f < 1500; f++) {
+    chaseState = step(chaseState, {}, rng, world);
+    const boar = chaseState.npcs.find((n) => n.id === "boar-1");
+    if (!nav.isWalkable(boar.x, boar.y)) enteredBlocked = true;
+    if (Math.hypot(boar.x - chaseState.player.x, boar.y - chaseState.player.y) < 1.0) { reached = true; break; }
+  }
+  check("npc chases around a house and reaches the player", reached === true,
+    `boar=(${chaseState.npcs.find((n) => n.id === "boar-1").x.toFixed(2)}, ${chaseState.npcs.find((n) => n.id === "boar-1").y.toFixed(2)})`);
+  check("npc never enters a blocked cell", enteredBlocked === false);
+}
 
 // 3b. Quests on the real world.
 const talkState = steer("supuli-m1", world, (s) => s.npcs[0], 600, 60);
@@ -190,6 +227,13 @@ for (let f = 0; f < 300; f++) defaultInputs.push({ dx: 1, dy: 1 });
 for (let f = 0; f < 120; f++) defaultInputs.push({ dx: 0, dy: 0, interact: true });
 const defaultRun = simulate("supuli-m1", 420, defaultInputs, DEFAULT_WORLD);
 check("default world talk quest completes", defaultRun.state.quests[0].done === true);
+
+// 3f. Audio voices (pure core module — no AudioContext needed).
+check("audio voices defined", ["cast", "bite", "catch", "talk", "quest", "hurt", "heal", "hit"].every((v) => Array.isArray(VOICES[v]) && VOICES[v].length > 0));
+check("audio catch voice ascends", scheduleVoice("catch").map((e) => e.freq).every((f, i, a) => i === 0 || f > a[i - 1]));
+check("audio unknown voice is empty", scheduleVoice("nope").length === 0);
+check("audio schedule offsets by when", scheduleVoice("bite", 2)[0].at === 2);
+check("audio bgm has 4 chords", BGM_CHORDS.length === 4 && BGM_CHORDS.every((c) => c.length === 3) && BGM_CHORD_SECONDS === 4);
 
 // 4. Forbidden APIs in the sim path (src/core only).
 const forbidden = ["Math.random", "Date.now", "performance.now"];

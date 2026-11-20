@@ -11,7 +11,10 @@
 //   any    -> defeated: npc.hp <= 0 (player attack)
 //   defeated -> patrol: after npcRespawnTicks, respawn at home with full HP
 //   flee   -> patrol: npc.hp > fleeHp and distance(player) > sight + 3
-// Steering: seek + arrive. AI ticks every step here (10-20Hz tick is a
+// Steering: seek + arrive, plus the navmesh for NPCs. An NPC steers straight
+// when the line to its target is clear; when a house or tree blocks the way
+// it follows a navmesh path (replanned only when the target moved far).
+// AI ticks every step here (10-20Hz tick is a
 // renderer-side optimisation; the sim itself is deterministic either way).
 //
 // Quests (from the manifest):
@@ -126,6 +129,8 @@ export function createInitialState(seed, world = DEFAULT_WORLD) {
       damage: n.damage,
       waypoint: i === 0 ? (startWp >= 0 ? startWp : 0) : 0,
       path: [0],
+      navPath: [],
+      navIndex: 0,
     })),
     shards: world.shards.map((s) => ({ id: s.id, x: s.x, y: s.y, collected: false })),
     crops: (world.crops || []).map((c) => ({ id: c.id, x: c.x, y: c.y, collected: false })),
@@ -136,6 +141,32 @@ export function createInitialState(seed, world = DEFAULT_WORLD) {
     lastHit: null,
     rngNote: `patrol target picked by fork('ai:patrol') from seed ${rng.seedString}`,
   };
+}
+
+function moveNpc(npc, tx, ty, speed, world) {
+  const nav = world.navmesh;
+  if (nav && !nav.lineClear(npc.x, npc.y, tx, ty)) {
+    const end = npc.navPath.length > 0 ? npc.navPath[npc.navPath.length - 1] : null;
+    const stale = !end || Math.hypot(end.x - tx, end.y - ty) > 1.5;
+    if (npc.navPath.length === 0 || npc.navIndex >= npc.navPath.length || stale) {
+      npc.navPath = nav.findPath({ x: npc.x, y: npc.y }, { x: tx, y: ty }) || [];
+      npc.navIndex = 0;
+    }
+    if (npc.navIndex < npc.navPath.length) {
+      const wp = npc.navPath[npc.navIndex];
+      if (Math.hypot(wp.x - npc.x, wp.y - npc.y) < 0.3) npc.navIndex++;
+      if (npc.navIndex < npc.navPath.length) {
+        const t = npc.navPath[npc.navIndex];
+        const moved = seek(npc, t, speed, STEP);
+        npc.x = moved.x;
+        npc.y = moved.y;
+        return;
+      }
+    }
+  }
+  const moved = seek(npc, { x: tx, y: ty }, speed, STEP);
+  npc.x = moved.x;
+  npc.y = moved.y;
 }
 
 // One fixed step. `input` is {dx, dy, interact?, attack?} with dx/dy in [-1, 1].
@@ -199,19 +230,15 @@ export function step(state, input, rng, world = DEFAULT_WORLD) {
 
     if (npc.state === "patrol") {
       const target = waypoints[npc.waypoint];
-      const moved = seek(npc, target, NPC_SPEED, STEP);
-      npc.x = moved.x;
-      npc.y = moved.y;
-      if (moved.arrived) {
+      moveNpc(npc, target.x, target.y, NPC_SPEED, world);
+      if (Math.hypot(target.x - npc.x, target.y - npc.y) < 0.15) {
         const options = (edges[npc.waypoint] || []).filter((id) => id !== npc.waypoint);
         const nextWp = options.length > 0 ? rng.pick(options) : npc.waypoint;
         npc.path = findPath(npc.waypoint, nextWp, edges, waypoints) || [nextWp];
         npc.waypoint = nextWp;
       }
     } else if (npc.state === "chase") {
-      const moved = seek(npc, next.player, NPC_SPEED * 1.15, STEP);
-      npc.x = moved.x;
-      npc.y = moved.y;
+      moveNpc(npc, next.player.x, next.player.y, NPC_SPEED * 1.15, world);
     } else {
       // flee: seek away from the player.
       const away = { x: npc.x + (npc.x - next.player.x), y: npc.y + (npc.y - next.player.y) };

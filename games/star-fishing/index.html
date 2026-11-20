@@ -43,6 +43,7 @@
   }
   #cast-btn { right: 96px; }
   #reel-btn { right: 12px; background: rgba(180, 60, 40, 0.9); }
+  #mute-btn { right: 180px; }
 </style>
 </head>
 <body>
@@ -62,6 +63,7 @@
 <div id="help">WASD/방향키 이동 · E 던지기/대화 · 스페이스바 챔질 · 드래그 이동(터치)</div>
 <button class="btn" id="cast-btn">🎣 던지기</button>
 <button class="btn" id="reel-btn">🌀 챔질</button>
+<button class="btn" id="mute-btn">🔊</button>
 <script type="importmap">
 { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
 </script>
@@ -72,6 +74,7 @@ import { stateHash } from "../../src/core/state-hash.js";
 import { validateWorldManifest, worldToSim } from "../../src/core/worldforge.js";
 import { createInitialState, step, SEED, TICK } from "./fishing.js";
 import { createAssetLoader } from "../../src/render/asset-loader.js";
+import { createAudioManager } from "../../src/render/audio.js";
 
 const SAVE_KEY = "aldol-engine.star-fishing-m2.save.v1";
 
@@ -85,6 +88,12 @@ const world = worldToSim(manifest);
 const assetLoader = createAssetLoader({ baseUrl: "./" });
 const assets = await assetLoader.loadAll(manifest);
 const assetStatus = { loaded: [...assets.loaded.keys()], failed: assets.failed };
+
+// Audio: procedural WebAudio voices (no audio files). BGM starts on the first gesture.
+const audio = createAudioManager();
+audio.setMuted(localStorage.getItem("aldol-engine.audio.muted") === "1");
+window.addEventListener("pointerdown", () => audio.startBgm(), { once: true });
+window.addEventListener("keydown", () => audio.startBgm(), { once: true });
 
 const rng = new Rng(SEED);
 let state = createInitialState(SEED, world);
@@ -431,8 +440,16 @@ let drag = null;
 window.addEventListener("keydown", (e) => {
   if (e.key === " ") { reelPressed = true; e.preventDefault(); }
   if (e.key === "e" || e.key === "E") castPressed = true;
+  if (e.key.toLowerCase() === "m") toggleMute();
   keys.add(e.key.toLowerCase());
 });
+function toggleMute() {
+  audio.setMuted(!audio.muted);
+  localStorage.setItem("aldol-engine.audio.muted", audio.muted ? "1" : "0");
+  document.getElementById("mute-btn").textContent = audio.muted ? "🔇" : "🔊";
+}
+document.getElementById("mute-btn").textContent = audio.muted ? "🔇" : "🔊";
+document.getElementById("mute-btn").addEventListener("pointerdown", () => toggleMute());
 window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
 document.getElementById("cast-btn").addEventListener("pointerdown", () => { castPressed = true; });
 document.getElementById("reel-btn").addEventListener("pointerdown", () => { reelPressed = true; });
@@ -462,6 +479,7 @@ function readInput() {
   if (input.cast && angler && Math.hypot(state.player.x - angler.x, state.player.y - angler.y) < 1.5) {
     input.interact = true;
     delete input.cast;
+    audio.play("talk");
   }
   return input;
 }
@@ -530,14 +548,22 @@ function frame(now) {
   }
   if (stepped) {
     for (const q of state.quests) {
-      if (q.done && !wasDone.get(q.id)) { showBark(barkRng.pick(BARKS.quest)); saveGame("의뢰 완료, 저장됨"); }
+      if (q.done && !wasDone.get(q.id)) {
+        wasDone.set(q.id, true);
+        audio.play("quest");
+        showBark(barkRng.pick(BARKS.quest));
+        saveGame("의뢰 완료, 저장됨");
+      }
     }
     if (state.caught.length > prevCaught) {
       prevCaught = state.caught.length;
+      audio.play("catch");
       showBark(barkRng.pick(BARKS.catch));
       if (lastBobber) burstSparkles(lastBobber.x, 0.6, lastBobber.y);
       saveGame("고기 낚음, 저장됨");
     }
+    if (prevPhase === "idle" && state.fishing.phase === "waiting") audio.play("cast");
+    if (prevPhase !== "bite" && state.fishing.phase === "bite") audio.play("bite");
     if (prevPhase === "waiting" && state.fishing.phase === "cooldown") showBark(barkRng.pick(BARKS.scare));
     prevPhase = state.fishing.phase;
     if (now - lastSave > 5000) { saveGame(); lastSave = now; }
@@ -631,6 +657,7 @@ window.__STAR_FISHING__ = {
   get state() { return state; },
   get hash() { return stateHash(state); },
   world, saveKey: SAVE_KEY, assets: assetStatus,
+  audio: { get muted() { return audio.muted; }, get played() { return audio.played; } },
 };
 refreshHud();
 requestAnimationFrame(frame);

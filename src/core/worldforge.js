@@ -1,3 +1,5 @@
+import { buildNavmesh } from "./navmesh.js";
+
 // WorldForge manifest (worldforge/0.1) — minimal JS mirror of the official
 // validator (packages/worldforge-schema/src/validate.ts, P4-2 2026-11-16).
 // The full WorldForge runtime (Zod + PlayCanvas app) is NOT vendored here;
@@ -177,5 +179,13 @@ export function worldToSim(world) {
   const placeMap = {};
   for (const p of world.places) placeMap[p.id] = toSim(p.position);
 
-  return { worldId: world.world.id, bounds: { minX, maxX, minY, maxY }, waypoints, edges, houses, trees, shards, crops, herbs, scarecrows, trophies, reeds, npcs, spawn, quests, combat, fishing, places: placeMap };
+  // Navmesh: houses, trees and scarecrows are circular obstacles.
+  const obstacles = [
+    ...houses.map((h) => ({ x: h.x, y: h.y, radius: 1.2 })),
+    ...trees.map((t) => ({ x: t.x, y: t.y, radius: 0.6 })),
+    ...scarecrows.map((s) => ({ x: s.x, y: s.y, radius: 0.5 })),
+  ];
+  const navmesh = buildNavmesh({ bounds: { minX, maxX, minY, maxY }, obstacles });
+
+  return { worldId: world.world.id, bounds: { minX, maxX, minY, maxY }, waypoints, edges, houses, trees, shards, crops, herbs, scarecrows, trophies, reeds, npcs, spawn, quests, combat, fishing, places: placeMap, navmesh };
 }

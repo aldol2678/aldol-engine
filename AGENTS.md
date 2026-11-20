@@ -43,9 +43,11 @@
 - 새 게임이 GLB를 쓰면 `tools/check-<game>.mjs`에 매직바이트 검증 + 프로브 훅(`assets.loaded/failed`) 확인을 넣는다.
 
 ## AI 최소 집합 (M1)
+- 길찾기는 내비메시 (`src/core/navmesh.js`): 걷는 구역을 0.5 셀 격자로 나누고 집·나무·허수아비를 원형 장애물로 막는다. NPC는 직선이 뚫리면 직진, 막히면 A* + 직선 단축(string pulling) 경로를 따라간다. 경로는 결정적이다(힙 동점 해소는 삽입 순서). 심은 `world.navmesh`만 본다.
+- 소리 (`src/core/audio.js` + `src/render/audio.js`): 음성(낚시·입질·챔질·대화·의뢰·피격·회복·타격)은 오디오 파일 없이 WebAudio 오실레이터로 합성한다. 음정·길이 표는 코어에 두고(WebAudio 없이 테스트 가능), 재생은 렌더러에서만 한다. BGM은 C–Am–F–G 패드 4초 루프. 오디오는 게임 로직에 절대 영향을 주지 않으며, 로드 실패 시 소리만 안 나고 게임은 그대로 돌아간다. 음소거는 M 키 또는 🔊 버튼, `localStorage`에 저장한다.
 - FSM 4상태: 순찰(patrol) · 추격(chase) · 도망(flee) · 처치됨(defeated, 10초 뒤 집에서 리스폰). 전이 조건은 `src/core/sim.js`에 표로 적는다.
 - 스티어링 seek/flee/wander + arrive.
-- 웨이포인트 그래프 A* (`NavProvider` 인터페이스만 본다. M1 구현은 웨이포인트, M2에서 내비메시로 교체).
+- 웨이포인트 그래프 A*는 순찰 목표 선택에만 쓴다. NPC 이동 길찾기는 내비메시(위 참조).
 - 작성된 대사(bark) 풀 — LLM 없이 시드 RNG로 고른다.
 - 포함하지 않는다: GOAP, LLM NPC, 브라우저 ML, 클라우드 LLM 게임 루프 연결.
 

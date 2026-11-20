@@ -37,12 +37,15 @@
 <div id="bark"></div>
 <div id="prompt">E: 대화하기</div>
 <div id="attack-btn">⚔ 공격</div>
+<div id="mute-btn">🔊</div>
 <div id="help">WASD/방향키 이동 · E 대화 · 스페이스바 공격 · 드래그 이동(터치)</div>
 <style>
   #attack-btn { position: absolute; right: 16px; bottom: 56px; width: 72px; height: 72px; border-radius: 50%; background: rgba(180, 60, 60, 0.85); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: bold; user-select: none; touch-action: none; }
+  #mute-btn { position: absolute; right: 16px; bottom: 140px; width: 44px; height: 44px; border-radius: 50%; background: rgba(16, 26, 18, 0.85); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 20px; user-select: none; touch-action: none; cursor: pointer; }
 </style>
 <script type="module">
 import * as THREE from "three";
+import { createAudioManager } from "../../src/render/audio.js";
 import { Rng } from "../../src/core/rng.js";
 import { createInitialState, step, simulate, STEP } from "../../src/core/sim.js";
 import { stateHash } from "../../src/core/state-hash.js";
@@ -276,8 +279,22 @@ let touchVec = { x: 0, y: 0 };
 addEventListener("keydown", (e) => {
   keys[e.key.toLowerCase()] = true;
   if (e.key.toLowerCase() === "e") interactPressed = true;
+  if (e.key.toLowerCase() === "m") toggleMute();
   if (e.code === "Space") { attackPressed = true; e.preventDefault(); }
 });
+
+// Audio: procedural WebAudio voices (no audio files). BGM starts on the first gesture.
+const audio = createAudioManager();
+audio.setMuted(localStorage.getItem("aldol-engine.audio.muted") === "1");
+window.addEventListener("pointerdown", () => audio.startBgm(), { once: true });
+window.addEventListener("keydown", () => audio.startBgm(), { once: true });
+function toggleMute() {
+  audio.setMuted(!audio.muted);
+  localStorage.setItem("aldol-engine.audio.muted", audio.muted ? "1" : "0");
+  document.getElementById("mute-btn").textContent = audio.muted ? "🔇" : "🔊";
+}
+document.getElementById("mute-btn").textContent = audio.muted ? "🔇" : "🔊";
+document.getElementById("mute-btn").addEventListener("pointerdown", () => toggleMute());
 addEventListener("keyup", (e) => { keys[e.key.toLowerCase()] = false; });
 let dragStart = null;
 renderer.domElement.addEventListener("pointerdown", (e) => { dragStart = { x: e.clientX, y: e.clientY }; });
@@ -382,17 +399,19 @@ function frame(now) {
     }
     if (state.lastHit && (!prevHitTick || state.lastHit.tick !== prevHitTick)) {
       prevHitTick = state.lastHit.tick;
+      audio.play("hit");
       showBark(barkRng.pick(BARKS.hit));
     }
     for (const q of state.quests) {
-      if (q.done && !wasDone.get(q.id)) { showBark(barkRng.pick(BARKS.quest)); saveGame("의뢰 완료, 저장됨"); }
+      if (q.done && !wasDone.get(q.id)) { audio.play("quest"); showBark(barkRng.pick(BARKS.quest)); saveGame("의뢰 완료, 저장됨"); }
     }
     const herbsNow = state.herbs.filter((h) => h.consumed).length;
     if (herbsNow > prevHerbsConsumed) {
       prevHerbsConsumed = herbsNow;
+      audio.play("heal");
       showBark("약초를 먹었어. 체력이 회복됐어!");
     }
-    if (state.player.hp < hpBefore) showBark("아야! 멧돼지에게 받혔어!");
+    if (state.player.hp < hpBefore) { audio.play("hurt"); showBark("아야! 멧돼지에게 받혔어!"); }
   }
   if (stepped) refreshHud();
   if (barkTimer > 0) { barkTimer -= dt; if (barkTimer <= 0) barkEl.style.display = "none"; }
@@ -437,6 +456,7 @@ window.__SUPULI_M1__ = {
   get state() { return state; },
   get hash() { return stateHash(state); },
   world, simulate, saveKey: SAVE_KEY,
+  audio: { get muted() { return audio.muted; }, get played() { return audio.played; } },
 };
 </script>
 </body>
