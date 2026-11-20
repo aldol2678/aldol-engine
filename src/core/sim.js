@@ -1,5 +1,6 @@
 // Fixed-step simulation core (pure: no rendering, no wall clock, no Math.random).
-// M1 slice: Supuli village — 1 map, player movement, 1 NPC with a 3-state FSM.
+// M1 slice: Supuli village — 1 map, player movement, 1 NPC with a 3-state FSM,
+// 1 quest (talk to the villager: approach within 1.5 and set input.interact).
 //
 // FSM transitions (npc.state):
 //   patrol -> chase : distance(player) < SIGHT (6)
@@ -88,6 +89,12 @@ export function createInitialState(seed) {
       path: [2],
     },
     rngNote: `patrol target picked by fork('ai:patrol') from seed ${rng.seedString}`,
+    quest: {
+      id: "talk-to-villager",
+      title: "이웃 주민과 대화하기",
+      hint: "마을 주민에게 다가가 E를 눌러 대화하세요.",
+      done: false,
+    },
   };
 }
 
@@ -137,6 +144,12 @@ export function step(state, input, rng) {
     const moved = seek(npc, away, NPC_SPEED * 1.3, STEP);
     npc.x = Math.max(-6, Math.min(10, moved.x));
     npc.y = Math.max(-2, Math.min(8, moved.y));
+  }
+
+  // Quest: talk to the villager. Interact within 1.5 units.
+  const finalDist = Math.hypot(next.player.x - npc.x, next.player.y - npc.y);
+  if (!next.quest.done && input.interact && finalDist < 1.5) {
+    next.quest.done = true;
   }
   return next;
 }

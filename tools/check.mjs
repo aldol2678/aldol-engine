@@ -47,6 +47,15 @@ const chase = simulate("supuli-m1", 600, { dx: 1, dy: 1 });
 check("npc leaves patrol or chases", ["patrol", "chase", "flee"].includes(chase.state.npc.state), `npc=${chase.state.npc.state}`);
 check("A* path exists 0->2", Array.isArray(findPath(0, 2)) && findPath(0, 2)[0] === 0, `path=${JSON.stringify(findPath(0, 2))}`);
 
+// 3b. Quest: walk to the villager and interact -> quest done.
+const questInputs = [];
+for (let f = 0; f < 300; f++) questInputs.push({ dx: 1, dy: 1 });
+for (let f = 0; f < 120; f++) questInputs.push({ dx: 0, dy: 0, interact: true });
+const questRun = simulate("supuli-m1", 420, questInputs);
+check("quest talk-to-villager completes", questRun.state.quest.done === true, `done=${questRun.state.quest.done}`);
+const noInteract = simulate("supuli-m1", 420, questInputs.map((i) => ({ dx: i.dx, dy: i.dy })));
+check("quest does not complete without interact", noInteract.state.quest.done === false, `done=${noInteract.state.quest.done}`);
+
 // 4. Forbidden APIs in the sim path (src/core only).
 const forbidden = ["Math.random", "Date.now", "performance.now"];
 for (const f of jsFiles.filter((x) => x.includes(`${"src"}/core/`))) {

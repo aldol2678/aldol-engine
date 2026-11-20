@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>수풀리 M1 — 마을 1맵 슬라이스 | Aldol Engine</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #101a12; font-family: system-ui, sans-serif; }
+  #app { position: fixed; inset: 0; }
+  canvas { display: block; }
+  .panel { position: absolute; left: 12px; top: 12px; background: rgba(16, 26, 18, 0.82); color: #e8f3e8; padding: 10px 12px; border-radius: 10px; max-width: 320px; line-height: 1.5; }
+  .panel h1 { font-size: 15px; margin: 0 0 4px; }
+  .panel p { font-size: 13px; margin: 2px 0; }
+  .panel .done { color: #9be49b; }
+  #bark { position: absolute; left: 50%; bottom: 92px; transform: translateX(-50%); background: #fffbe8; color: #222; border-radius: 12px; padding: 8px 14px; font-size: 14px; display: none; max-width: 80vw; box-shadow: 0 2px 10px rgba(0,0,0,.35); }
+  #prompt { position: absolute; left: 50%; bottom: 48px; transform: translateX(-50%); background: rgba(0,0,0,.65); color: #fff; border-radius: 8px; padding: 6px 12px; font-size: 14px; display: none; }
+  #help { position: absolute; right: 12px; bottom: 12px; color: #cfe3cf; background: rgba(16,26,18,.7); padding: 6px 10px; border-radius: 8px; font-size: 12px; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
+</head>
+<body>
+<div id="app"></div>
+<div class="panel">
+  <h1>수풀리 M1 — 마을 슬라이스</h1>
+  <p id="quest">의뢰: 이웃 주민과 대화하기</p>
+  <p id="npc-state">주민 상태: 순찰</p>
+  <p id="pos">위치: (0.0, 0.0)</p>
+  <p id="save-state">저장: —</p>
+</div>
+<div id="bark"></div>
+<div id="prompt">E: 대화하기</div>
+<div id="help">WASD/방향키 이동 · E 대화 · 드래그 이동(터치)</div>
+<script type="module">
+import * as THREE from "three";
+import { Rng } from "../../src/core/rng.js";
+import { createInitialState, step, simulate, WAYPOINTS, STEP } from "../../src/core/sim.js";
+import { stateHash } from "../../src/core/state-hash.js";
+
+const SEED = "supuli-m1";
+const SAVE_KEY = "aldol-engine.supuli-m1.save.v1";
+
+const BARKS = {
+  patrol: ["오늘 날씨 참 좋지.", "마을은 평화로워야 해.", "길을 잃었나? 마을은 작아."],
+  chase: ["어? 누구야, 거기!", "잠깐, 너 누구야?", "이쪽으로 와 봐."],
+  flee: ["살려줘! 도망가야 해!", "너무 무서워…", "저리 가!"],
+  quest: ["고마워! 마을을 잘 부탁해.", "너라면 수풀을 지킬 수 있을 거야."],
+};
+const STATE_LABEL = { patrol: "순찰", chase: "추격", flee: "도망" };
+
+// --- state (save is a snapshot, not a seed: it restores position + quest) ---
+let state = createInitialState(SEED);
+const saved = (() => { try { return JSON.parse(localStorage.getItem(SAVE_KEY)); } catch { return null; } })();
+if (saved && saved.player) {
+  state.player.x = saved.player.x;
+  state.player.y = saved.player.y;
+  if (saved.questDone) state.quest.done = true;
+  document.getElementById("save-state").textContent = "저장: 불러옴";
+}
+const barkRng = new Rng(SEED).fork("bark");
+
+// --- three.js scene ---
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+document.getElementById("app").appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x9fc5e8);
+scene.fog = new THREE.Fog(0x9fc5e8, 25, 60);
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 100);
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x3a5f3a, 1.1));
+const sun = new THREE.DirectionalLight(0xfff2cc, 1.4);
+sun.position.set(8, 14, 6);
+scene.add(sun);
+
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(24, 18),
+  new THREE.MeshStandardMaterial({ color: 0x5da85d })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.position.set(2, 0, 3);
+scene.add(ground);
+
+// Waypoint markers.
+for (const wp of WAYPOINTS) {
+  const dot = new THREE.Mesh(
+    new THREE.CircleGeometry(0.28, 16),
+    new THREE.MeshBasicMaterial({ color: 0xffe066 })
+  );
+  dot.rotation.x = -Math.PI / 2;
+  dot.position.set(wp.x, 0.02, wp.y);
+  scene.add(dot);
+}
+
+// Village houses (boxes + prism roofs).
+const houseSpots = [[-4, -1], [6, -1], [-3, 5], [9, 4], [2, 7]];
+for (const [hx, hy] of houseSpots) {
+  const house = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.6, 2), new THREE.MeshStandardMaterial({ color: 0xd8b58c }));
+  body.position.y = 0.8;
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(1.9, 1.1, 4), new THREE.MeshStandardMaterial({ color: 0xa34d2d }));
+  roof.position.y = 2.15;
+  roof.rotation.y = Math.PI / 4;
+  house.add(body, roof);
+  house.position.set(hx, 0, hy);
+  scene.add(house);
+}
+
+function makePerson(color) {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.32, 0.7, 4, 8), new THREE.MeshStandardMaterial({ color }));
+  body.position.y = 0.75;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 16, 12), new THREE.MeshStandardMaterial({ color: 0xf2c9a0 }));
+  head.position.y = 1.55;
+  g.add(body, head);
+  scene.add(g);
+  return g;
+}
+const playerMesh = makePerson(0x2e7d32);
+const npcMesh = makePerson(0xe67e22);
+
+// --- input ---
+const keys = {};
+let interactPressed = false;
+let touchVec = { x: 0, y: 0 };
+addEventListener("keydown", (e) => {
+  keys[e.key.toLowerCase()] = true;
+  if (e.key.toLowerCase() === "e") interactPressed = true;
+});
+addEventListener("keyup", (e) => { keys[e.key.toLowerCase()] = false; });
+let dragStart = null;
+renderer.domElement.addEventListener("pointerdown", (e) => { dragStart = { x: e.clientX, y: e.clientY }; });
+renderer.domElement.addEventListener("pointermove", (e) => {
+  if (!dragStart) return;
+  touchVec = { x: (e.clientX - dragStart.x) / 40, y: (e.clientY - dragStart.y) / 40 };
+});
+addEventListener("pointerup", () => { dragStart = null; touchVec = { x: 0, y: 0 }; });
+
+function readInput() {
+  // Screen mapping: camera sits at +z looking -z, so W (up-screen) = +y, S = -y.
+  let dx = (keys["d"] || keys["arrowright"] ? 1 : 0) - (keys["a"] || keys["arrowleft"] ? 1 : 0);
+  let dy = (keys["w"] || keys["arrowup"] ? 1 : 0) - (keys["s"] || keys["arrowdown"] ? 1 : 0);
+  dx += touchVec.x;
+  dy -= touchVec.y;
+  const len = Math.hypot(dx, dy);
+  if (len > 1) { dx /= len; dy /= len; }
+  const input = { dx, dy };
+  if (interactPressed) input.interact = true;
+  interactPressed = false;
+  return input;
+}
+
+// --- save ---
+function saveGame(note) {
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({
+      player: state.player, questDone: state.quest.done, tick: state.tick, savedAt: Date.now(),
+    }));
+    document.getElementById("save-state").textContent = `저장: ${note || "저장됨"}`;
+  } catch { /* storage unavailable: game still runs */ }
+}
+setInterval(() => saveGame("자동 저장됨"), 5000);
+addEventListener("beforeunload", () => saveGame("저장됨"));
+
+// --- HUD + bark ---
+const questEl = document.getElementById("quest");
+const npcEl = document.getElementById("npc-state");
+const posEl = document.getElementById("pos");
+const barkEl = document.getElementById("bark");
+const promptEl = document.getElementById("prompt");
+let barkTimer = 0;
+let prevNpcState = state.npc.state;
+function showBark(text) {
+  barkEl.textContent = text;
+  barkEl.style.display = "block";
+  barkTimer = 2.5;
+}
+function refreshHud() {
+  questEl.innerHTML = state.quest.done
+    ? `<span class="done">의뢰 완료: ${state.quest.title} ✔</span>`
+    : `의뢰: ${state.quest.title}`;
+  npcEl.textContent = `주민 상태: ${STATE_LABEL[state.npc.state] || state.npc.state}`;
+  posEl.textContent = `위치: (${state.player.x.toFixed(1)}, ${state.player.y.toFixed(1)})`;
+  const dist = Math.hypot(state.player.x - state.npc.x, state.player.y - state.npc.y);
+  promptEl.style.display = (!state.quest.done && dist < 1.5) ? "block" : "none";
+}
+
+// --- main loop: fixed-step accumulator, render from sim state ---
+let last = performance.now();
+let acc = 0;
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min((now - last) / 1000, 0.1);
+  last = now;
+  acc += dt;
+  const input = readInput();
+  let stepped = false;
+  while (acc >= STEP) {
+    const before = state.npc.state;
+    const wasDone = state.quest.done;
+    state = step(state, input, barkRng);
+    stepped = true;
+    acc -= STEP;
+    if (state.npc.state !== before) showBark(barkRng.pick(BARKS[state.npc.state]));
+    if (state.quest.done && !wasDone) { showBark(barkRng.pick(BARKS.quest)); saveGame("의뢰 완료, 저장됨"); }
+  }
+  if (stepped) refreshHud();
+  if (barkTimer > 0) { barkTimer -= dt; if (barkTimer <= 0) barkEl.style.display = "none"; }
+
+  playerMesh.position.set(state.player.x, 0, state.player.y);
+  npcMesh.position.set(state.npc.x, 0, state.npc.y);
+  camera.position.set(state.player.x, 9, state.player.y + 9);
+  camera.lookAt(state.player.x, 0, state.player.y);
+  renderer.render(scene, camera);
+}
+addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+refreshHud();
+requestAnimationFrame(frame);
+
+// QA hook: window.__SUPULI_M1__ = { state, hash, simulate, saveKey }
+window.__SUPULI_M1__ = {
+  get state() { return state; },
+  get hash() { return stateHash(state); },
+  simulate, saveKey: SAVE_KEY,
+};
+
+</script>
+</body>
+</html>
