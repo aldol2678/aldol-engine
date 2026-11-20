@@ -16,9 +16,12 @@
 //
 // Quests (from the manifest):
 //   quest.talk    — input.interact within range of the named NPC.
-//   quest.collect — walk within 1.0 of an uncollected shard.
+//   quest.collect — walk within 1.0 of an uncollected item (assetId picks the
+//                   pool: "star-shard" -> shards, "crop" -> crops).
 //   quest.arrive  — walk within range of the named place.
 //   quest.defeat  — the named NPC's HP reaches 0 (player attack).
+// Healing herbs (component game.heal): walking within 1.0 consumes one and
+// restores its amount of HP, capped at the combat rule's playerHp.
 // Combat-lite (rule game.combat): a hostile NPC in chase state touching the
 // player (dist < 0.8) deals contactDamage, once per contactCooldownTicks.
 // Player attack (input.attack): nearest hostile NPC within attackRange takes
@@ -48,6 +51,8 @@ export const DEFAULT_WORLD = {
   houses: [],
   trees: [],
   shards: [],
+  crops: [],
+  herbs: [],
   npcs: [{ id: "villager-1", name: "마을 주민", x: 8, y: 6, homeX: 4, homeY: 3, hp: 100, homePlaceId: null, interaction: "talk", sight: 6, damage: 0 }],
   spawn: { x: 0, y: 0 },
   quests: [{ id: "talk-to-villager", name: "이웃 주민과 대화하기", type: "quest.talk", nodes: [{ id: "talk", type: "quest.talk", params: { npcId: "villager-1", range: 1.5 } }], edges: [], params: new Map() }],
@@ -123,6 +128,8 @@ export function createInitialState(seed, world = DEFAULT_WORLD) {
       path: [0],
     })),
     shards: world.shards.map((s) => ({ id: s.id, x: s.x, y: s.y, collected: false })),
+    crops: (world.crops || []).map((c) => ({ id: c.id, x: c.x, y: c.y, collected: false })),
+    herbs: (world.herbs || []).map((h) => ({ id: h.id, x: h.x, y: h.y, amount: h.amount, consumed: false })),
     quests: world.quests.map((q) => ({ id: q.id, name: q.name, type: q.type, done: false, progress: 0 })),
     combatCooldown: 0,
     attackCooldown: 0,
@@ -230,6 +237,15 @@ export function step(state, input, rng, world = DEFAULT_WORLD) {
     }
   }
 
+  // Healing herbs: walk over one to consume it and restore HP (capped at max).
+  for (const herb of next.herbs) {
+    if (herb.consumed) continue;
+    if (Math.hypot(next.player.x - herb.x, next.player.y - herb.y) < 1.0) {
+      herb.consumed = true;
+      next.player.hp = Math.min(world.combat.playerHp, next.player.hp + herb.amount);
+    }
+  }
+
   // Quests.
   for (const quest of next.quests) {
     if (quest.done) continue;
@@ -242,10 +258,11 @@ export function step(state, input, rng, world = DEFAULT_WORLD) {
       }
     } else if (quest.type === "quest.collect") {
       const params = questNodeParams(world.quests.find((q) => q.id === quest.id) || {}, "collect");
-      for (const shard of next.shards) {
-        if (shard.collected) continue;
-        if (Math.hypot(next.player.x - shard.x, next.player.y - shard.y) < 1.0) {
-          shard.collected = true;
+      const pool = params.assetId === "crop" ? next.crops : next.shards;
+      for (const item of pool) {
+        if (item.collected) continue;
+        if (Math.hypot(next.player.x - item.x, next.player.y - item.y) < 1.0) {
+          item.collected = true;
           quest.progress += 1;
         }
       }

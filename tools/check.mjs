@@ -21,9 +21,10 @@ const manifest = JSON.parse(readFileSync(join(root, "games", "supuli", "world.js
 const validation = validateWorldManifest(manifest);
 check("world manifest valid", validation.valid, validation.errors.map((e) => `${e.code}@${e.path}`).join(", "));
 const world = worldToSim(manifest);
-check("world adapted", world.waypoints.length === 9 && world.houses.length === 5 && world.trees.length === 7
-  && world.shards.length === 5 && world.npcs.length === 4 && world.quests.length === 6 && world.bounds.maxX === 24,
-  `wp=${world.waypoints.length} houses=${world.houses.length} trees=${world.trees.length} shards=${world.shards.length} npcs=${world.npcs.length} quests=${world.quests.length} maxX=${world.bounds.maxX}`);
+check("world adapted", world.waypoints.length === 12 && world.houses.length === 5 && world.trees.length === 7
+  && world.shards.length === 5 && world.crops.length === 3 && world.herbs.length === 3
+  && world.npcs.length === 5 && world.quests.length === 9 && world.bounds.maxX === 24 && world.bounds.minY === -8,
+  `wp=${world.waypoints.length} houses=${world.houses.length} trees=${world.trees.length} shards=${world.shards.length} crops=${world.crops.length} herbs=${world.herbs.length} npcs=${world.npcs.length} quests=${world.quests.length} maxX=${world.bounds.maxX} minY=${world.bounds.minY}`);
 // A deliberately broken manifest must fail validation.
 const broken = structuredClone(manifest);
 broken.npcs[0].entityId = "ent-missing";
@@ -105,6 +106,42 @@ check("quest reach-forest-gate completes", gateState.quests.find((q) => q.id ===
 const deepState = steer("supuli-m1", world, () => world.places["deep-forest-heart"], 1800, 0);
 check("quest reach-deep-forest completes", deepState.quests.find((q) => q.id === "reach-deep-forest").done === true,
   `player=(${deepState.player.x.toFixed(1)}, ${deepState.player.y.toFixed(1)})`);
+const elderState = steer("supuli-m1", world, (s) => s.npcs.find((n) => n.id === "elder-1"), 600, 60);
+check("quest talk-to-elder completes", elderState.quests.find((q) => q.id === "talk-to-elder").done === true);
+let harvestState = createInitialState("supuli-m1", world);
+{
+  const rng = new Rng("supuli-m1").fork("ai:patrol");
+  for (const crop of world.crops) {
+    for (let f = 0; f < 400; f++) {
+      const dx = crop.x - harvestState.player.x;
+      const dy = crop.y - harvestState.player.y;
+      const len = Math.hypot(dx, dy);
+      if (len < 0.5) break;
+      harvestState = step(harvestState, { dx: dx / len, dy: dy / len }, rng, world);
+    }
+  }
+}
+check("quest harvest-crops completes", harvestState.quests.find((q) => q.id === "harvest-crops").done === true,
+  `progress=${harvestState.quests.find((q) => q.id === "harvest-crops").progress}`);
+const farmState = steer("supuli-m1", world, () => world.places["farm-center"], 900, 0);
+check("quest reach-farm completes", farmState.quests.find((q) => q.id === "reach-farm").done === true,
+  `player=(${farmState.player.x.toFixed(1)}, ${farmState.player.y.toFixed(1)})`);
+// Herb heal: start hurt, walk over herb-1, HP must rise by its amount (capped at max).
+let herbState = createInitialState("supuli-m1", world);
+herbState.player.hp = 50;
+{
+  const rng = new Rng("supuli-m1").fork("ai:patrol");
+  const herb = world.herbs[0];
+  for (let f = 0; f < 600; f++) {
+    const dx = herb.x - herbState.player.x;
+    const dy = herb.y - herbState.player.y;
+    const len = Math.hypot(dx, dy);
+    if (herbState.herbs[0].consumed) break;
+    herbState = step(herbState, { dx: dx / len, dy: dy / len }, rng, world);
+  }
+}
+check("herb heals on pickup", herbState.herbs[0].consumed === true && herbState.player.hp === 80,
+  `hp=${herbState.player.hp} consumed=${herbState.herbs[0].consumed}`);
 
 // 3c. Defeat quest: attack the boar until its HP hits 0, then it respawns.
 let defeatState = createInitialState("supuli-m1", world);

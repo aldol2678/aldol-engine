@@ -117,8 +117,17 @@ export function worldToSim(world) {
     .filter((e) => e.type === "entity.tree" && e.enabled !== false)
     .map((e) => ({ id: e.id, ...toSim(e.transform.position) }));
   const shards = world.entities
-    .filter((e) => e.components && e.components["game.collectible"] && e.enabled !== false)
+    .filter((e) => e.components?.["game.collectible"]?.questId === "collect-shards" && e.enabled !== false)
     .map((e) => ({ id: e.id, questId: e.components["game.collectible"].questId, ...toSim(e.transform.position) }));
+  const crops = world.entities
+    .filter((e) => e.components?.["game.collectible"]?.questId === "harvest-crops" && e.enabled !== false)
+    .map((e) => ({ id: e.id, questId: e.components["game.collectible"].questId, ...toSim(e.transform.position) }));
+  const herbs = world.entities
+    .filter((e) => e.components?.["game.heal"] && e.enabled !== false)
+    .map((e) => ({ id: e.id, amount: e.components["game.heal"].amount ?? 30, ...toSim(e.transform.position) }));
+  const scarecrows = world.entities
+    .filter((e) => e.type === "entity.scarecrow" && e.enabled !== false)
+    .map((e) => ({ id: e.id, ...toSim(e.transform.position) }));
 
   const npcs = world.npcs.map((n) => {
     const ent = entities.get(n.entityId);
@@ -150,5 +159,5 @@ export function worldToSim(world) {
   const placeMap = {};
   for (const p of world.places) placeMap[p.id] = toSim(p.position);
 
-  return { worldId: world.world.id, bounds: { minX, maxX, minY, maxY }, waypoints, edges, houses, trees, shards, npcs, spawn, quests, combat, places: placeMap };
+  return { worldId: world.world.id, bounds: { minX, maxX, minY, maxY }, waypoints, edges, houses, trees, shards, crops, herbs, scarecrows, npcs, spawn, quests, combat, places: placeMap };
 }
