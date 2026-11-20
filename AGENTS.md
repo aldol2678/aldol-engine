@@ -3,7 +3,7 @@
 이 저장소에서 일하는 에이전트(Moa·Ark·Naru 등)의 계약. 게임보다 먼저다.
 
 ## 목적
-- aldol.js 기반 웹 게임 엔진. M1 첫 게임은 **수풀리** (마을 1맵 슬라이스 → 2026-11-20 확장: 마을 + 숲입구 + 숲 깊은 곳 + 농장, 의뢰 9개, 전투 공격/처치, 작물·약초).
+- aldol.js 기반 웹 게임 엔진. M1 첫 게임은 **수풀리** (마을 1맵 슬라이스 → 2026-11-20 확장: 마을 + 숲입구 + 숲 깊은 곳 + 농장, 의뢰 9개, 전투 공격/처치, 작물·약초). M2 두 번째 게임은 **별낚시** (호수 낚시: 찌 던지기·물기 타이밍·챔질, 물고기 FSM, 의뢰 3개) — 같은 공유 코어(`src/core/`) 위의 새 게임으로 재사용을 증명한다.
 - Three.js 0.160.0, WebGL2 기본. 라이선스는 UNLICENSED (M3 전 MIT).
 - 배포는 Cloudflare Pages만. `latest` 태그는 쓰지 않는다.
 
@@ -30,6 +30,11 @@
 - `src/core/worldforge.js`는 공식 검증기(`validate.ts`)의 최소 JS 미러다. 필수 키·스키마 버전·중복 ID·참조 무결성(장소→구역, 길→장소, 엔티티→에셋, NPC→엔티티/집, 의뢰 노드/간선)을 검사하고, 매니페스트를 sim용 월드 객체로 변환한다(`worldToSim`). 좌표 변환: 매니페스트 `[x, y, z]`(Y-up) → sim 2D `(x, z)`.
 - 전체 WorldForge 런타임(Zod + PlayCanvas 앱)은 벤더링하지 않는다. 필요해지면 그때 결정한다.
 - 매니페스트가 바뀌면 `npm run check`의 매니페스트 검증이 먼저 잡는다. 검증 실패한 월드는 게임이 시작 전에 멈춘다.
+
+## M2 — 두 번째 게임 (재사용 증명)
+- 공유 코어는 `src/core/`만이다: `rng.js` (시드 RNG), `state-hash.js` (결정성 해시), `worldforge.js` (매니페스트 검증 + sim 변환). 게임별 규칙은 각 게임 폴더의 심(`games/<game>/*.js`)에 둔다 — 수풀리 `sim.js`를 복사해서 고치지 않는다.
+- 새 게임은 `games/<game>/world.json` (WorldForge 0.1 매니페스트) + 심 + `index.html` + `tools/check-<game>.mjs` + `package.json` 스크립트(`check:<game>`)로 구성한다. 저장 키는 게임마다 별도(`aldol-engine.<game>-m2.save.v1`).
+- `worldforge.js`를 바꿀 때는 양쪽 게임 체크(`npm run check` + `npm run check:fishing`)를 둘 다 돌린다. 어댑터에 게임별 필드를 추가할 때는 기본값(null/빈 배열)을 두고, 기존 게임이 안 쓰는 필드는 건드리지 않는다.
 
 ## AI 최소 집합 (M1)
 - FSM 4상태: 순찰(patrol) · 추격(chase) · 도망(flee) · 처치됨(defeated, 10초 뒤 집에서 리스폰). 전이 조건은 `src/core/sim.js`에 표로 적는다.

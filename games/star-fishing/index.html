@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>별낚시 M2 — 호수 낚시 | Aldol Engine</title>
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #0b1620; font-family: "Noto Sans KR", system-ui, sans-serif; }
+  #app { position: fixed; inset: 0; }
+  canvas { display: block; }
+  #hud {
+    position: absolute; top: 12px; left: 12px; max-width: 320px;
+    background: rgba(10, 20, 30, 0.72); color: #eaf6ff; border-radius: 10px;
+    padding: 12px 14px; font-size: 14px; line-height: 1.5; pointer-events: none;
+  }
+  #hud h1 { margin: 0 0 4px; font-size: 17px; }
+  #hud .done { color: #7dff9b; }
+  #hud .todo { color: #cfe8ff; }
+  #phase {
+    position: absolute; top: 12px; right: 12px; max-width: 280px;
+    background: rgba(10, 20, 30, 0.72); color: #ffe9a8; border-radius: 10px;
+    padding: 10px 14px; font-size: 15px; pointer-events: none;
+  }
+  #prompt {
+    position: absolute; bottom: 96px; left: 50%; transform: translateX(-50%);
+    background: rgba(10, 20, 30, 0.8); color: #fff; border-radius: 8px;
+    padding: 8px 14px; font-size: 15px; display: none;
+  }
+  #bark {
+    position: absolute; bottom: 150px; left: 50%; transform: translateX(-50%);
+    background: #fff; color: #222; border-radius: 12px; padding: 8px 14px;
+    font-size: 15px; display: none; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+  #help {
+    position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+    background: rgba(10, 20, 30, 0.6); color: #cfe8ff; border-radius: 8px;
+    padding: 6px 12px; font-size: 13px; max-width: calc(100vw - 24px); text-align: center;
+  }
+  .btn {
+    position: absolute; bottom: 64px; width: 72px; height: 72px; border-radius: 50%;
+    border: none; font-size: 15px; font-weight: bold; color: #fff;
+    background: rgba(30, 90, 140, 0.85); box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  }
+  #cast-btn { right: 96px; }
+  #reel-btn { right: 12px; background: rgba(180, 60, 40, 0.9); }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="hud">
+  <h1>별낚시 M2 — 호수 낚시</h1>
+  <div id="zone">구역: 호숫가</div>
+  <div id="score">점수: 0 · 낚은 고기: 0마리</div>
+  <div id="quests"></div>
+  <div id="npcs"></div>
+  <div id="pos"></div>
+  <div id="save-state">저장: 자동 저장됨</div>
+</div>
+<div id="phase">선착장 끝으로 가서 E를 눌러 찌를 던지세요.</div>
+<div id="prompt">E — 낚시꾼과 대화하기</div>
+<div id="bark"></div>
+<div id="help">WASD/방향키 이동 · E 던지기/대화 · 스페이스바 챔질 · 드래그 이동(터치)</div>
+<button class="btn" id="cast-btn">🎣 던지기</button>
+<button class="btn" id="reel-btn">🌀 챔질</button>
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { Rng } from "../../src/core/rng.js";
+import { stateHash } from "../../src/core/state-hash.js";
+import { validateWorldManifest, worldToSim } from "../../src/core/worldforge.js";
+import { createInitialState, step, SEED, TICK } from "./fishing.js";
+
+const SAVE_KEY = "aldol-engine.star-fishing-m2.save.v1";
+
+const worldRes = await fetch("./world.json");
+const manifest = await worldRes.json();
+const validation = validateWorldManifest(manifest);
+if (!validation.valid) throw new Error("invalid manifest: " + JSON.stringify(validation.errors));
+const world = worldToSim(manifest);
+
+const rng = new Rng(SEED);
+let state = createInitialState(SEED, world);
+
+// --- Save / load. ---
+function saveGame(note) {
+  localStorage.setItem(SAVE_KEY, JSON.stringify({
+    player: state.player,
+    score: state.score,
+    casts: state.casts,
+    caught: state.caught,
+    quests: state.quests.map((q) => ({ id: q.id, done: q.done, progress: q.progress })),
+    tick: state.tick, savedAt: Date.now(),
+  }));
+  document.getElementById("save-state").textContent = "저장: " + (note || "자동 저장됨");
+}
+function loadGame() {
+  let saved;
+  try { saved = JSON.parse(localStorage.getItem(SAVE_KEY) || "null"); } catch { saved = null; }
+  if (!saved) return;
+  if (saved.player) { state.player.x = saved.player.x; state.player.y = saved.player.y; }
+  if (typeof saved.score === "number") state.score = saved.score;
+  if (typeof saved.casts === "number") state.casts = saved.casts;
+  if (Array.isArray(saved.caught)) {
+    state.caught = saved.caught;
+    for (const c of saved.caught) {
+      const f = state.fish.find((x) => x.id === c.fishId);
+      if (f) { f.state = "caught"; f.caughtUntil = state.tick + 600; }
+    }
+  }
+  if (Array.isArray(saved.quests)) {
+    for (const sq of saved.quests) {
+      const q = state.quests.find((x) => x.id === sq.id);
+      if (q) { q.done = !!sq.done; q.progress = sq.progress ?? 0; }
+    }
+  }
+  document.getElementById("save-state").textContent = "저장: 불러옴";
+}
+loadGame();
+
+// --- Three.js scene. ---
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+document.getElementById("app").appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x9fd8ef);
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 200);
+camera.position.set(2, 16, 14);
+camera.lookAt(2, 0, -2);
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+const sun = new THREE.DirectionalLight(0xffffff, 1.0);
+sun.position.set(8, 16, 6);
+scene.add(sun);
+
+// Shore (green) and lake (blue, semi-transparent so fish show through).
+const shore = new THREE.Mesh(
+  new THREE.PlaneGeometry(16, 8),
+  new THREE.MeshStandardMaterial({ color: 0x5da24a })
+);
+shore.rotation.x = -Math.PI / 2;
+shore.position.set(2, 0, 4);
+scene.add(shore);
+const lake = new THREE.Mesh(
+  new THREE.PlaneGeometry(16, 8),
+  new THREE.MeshStandardMaterial({ color: 0x2e86c1, transparent: true, opacity: 0.65 })
+);
+lake.rotation.x = -Math.PI / 2;
+lake.position.set(2, 0.05, -4);
+scene.add(lake);
+
+// Dock: brown planks from the shore to the dock end.
+const dock = new THREE.Mesh(
+  new THREE.BoxGeometry(2, 0.25, 5.5),
+  new THREE.MeshStandardMaterial({ color: 0x8a6d3b })
+);
+dock.position.set(0, 0.15, -2.5);
+scene.add(dock);
+
+// Reeds along the shore edge.
+for (const r of world.reeds || []) {
+  const reed = new THREE.Mesh(
+    new THREE.ConeGeometry(0.35, 1.6, 6),
+    new THREE.MeshStandardMaterial({ color: 0x3f7a2e })
+  );
+  reed.position.set(r.x, 0.8, r.y);
+  scene.add(reed);
+}
+
+// Angler NPC (orange capsule, same style as Supuli villagers).
+const anglerMeshes = new Map();
+for (const n of state.npcs) {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 0.8, 4, 10), new THREE.MeshStandardMaterial({ color: 0xe67e22 }));
+  body.position.y = 0.8;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.32, 12, 10), new THREE.MeshStandardMaterial({ color: 0xf5c99b }));
+  head.position.y = 1.7;
+  g.add(body, head);
+  g.position.set(n.x, 0, n.y);
+  scene.add(g);
+  anglerMeshes.set(n.id, g);
+}
+
+// Fish: flattened cones under the water, colored + sized by species.
+const FISH_STYLE = {
+  small: { color: 0x7fb3d5, scale: 0.7 },
+  medium: { color: 0x2e86c1, scale: 1.0 },
+  big: { color: 0xffd700, scale: 1.5 },
+};
+const fishMeshes = new Map();
+for (const f of state.fish) {
+  const style = FISH_STYLE[f.species] || FISH_STYLE.small;
+  const mesh = new THREE.Mesh(
+    new THREE.ConeGeometry(0.35 * style.scale, 0.9 * style.scale, 8),
+    new THREE.MeshStandardMaterial({ color: style.color })
+  );
+  mesh.rotation.z = Math.PI / 2;
+  mesh.position.set(f.x, -0.15, f.y);
+  scene.add(mesh);
+  fishMeshes.set(f.id, mesh);
+}
+
+// Bobber (red sphere, shown while a cast is out).
+const bobberMesh = new THREE.Mesh(
+  new THREE.SphereGeometry(0.3, 12, 10),
+  new THREE.MeshStandardMaterial({ color: 0xe74c3c })
+);
+bobberMesh.visible = false;
+scene.add(bobberMesh);
+
+// Player (blue capsule).
+const playerGroup = new THREE.Group();
+const pBody = new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 0.8, 4, 10), new THREE.MeshStandardMaterial({ color: 0x3498db }));
+pBody.position.y = 0.8;
+const pHead = new THREE.Mesh(new THREE.SphereGeometry(0.32, 12, 10), new THREE.MeshStandardMaterial({ color: 0xf5c99b }));
+pHead.position.y = 1.7;
+playerGroup.add(pBody, pHead);
+scene.add(playerGroup);
+
+// --- Input. ---
+const keys = new Set();
+let castPressed = false;
+let reelPressed = false;
+let drag = null;
+window.addEventListener("keydown", (e) => {
+  if (e.key === " ") { reelPressed = true; e.preventDefault(); }
+  if (e.key === "e" || e.key === "E") castPressed = true;
+  keys.add(e.key.toLowerCase());
+});
+window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
+document.getElementById("cast-btn").addEventListener("pointerdown", () => { castPressed = true; });
+document.getElementById("reel-btn").addEventListener("pointerdown", () => { reelPressed = true; });
+renderer.domElement.addEventListener("pointerdown", (e) => { drag = { x: e.clientX, y: e.clientY, dx: 0, dy: 0 }; });
+renderer.domElement.addEventListener("pointermove", (e) => {
+  if (!drag) return;
+  drag.dx = e.clientX - drag.x;
+  drag.dy = e.clientY - drag.y;
+});
+renderer.domElement.addEventListener("pointerup", () => { drag = null; });
+
+function readInput() {
+  let dx = 0, dy = 0;
+  if (keys.has("a") || keys.has("arrowleft")) dx -= 1;
+  if (keys.has("d") || keys.has("arrowright")) dx += 1;
+  if (keys.has("w") || keys.has("arrowup")) dy += 1;
+  if (keys.has("s") || keys.has("arrowdown")) dy -= 1;
+  if (drag && Math.hypot(drag.dx, drag.dy) > 12) {
+    dx += drag.dx / 60;
+    dy -= drag.dy / 60;
+  }
+  const input = { dx, dy };
+  if (castPressed) { input.cast = true; castPressed = false; }
+  if (reelPressed) { input.reel = true; reelPressed = false; }
+  // E near the angler means talk, not cast.
+  const angler = state.npcs.find((n) => n.id === "angler-1");
+  if (input.cast && angler && Math.hypot(state.player.x - angler.x, state.player.y - angler.y) < 1.5) {
+    input.interact = true;
+    delete input.cast;
+  }
+  return input;
+}
+
+// --- HUD. ---
+const zoneEl = document.getElementById("zone");
+const scoreEl = document.getElementById("score");
+const questsEl = document.getElementById("quests");
+const npcsEl = document.getElementById("npcs");
+const posEl = document.getElementById("pos");
+const phaseEl = document.getElementById("phase");
+const promptEl = document.getElementById("prompt");
+const barkEl = document.getElementById("bark");
+let barkTimer = 0;
+const barkRng = new Rng(SEED + ":bark");
+function showBark(text) {
+  barkEl.textContent = text;
+  barkEl.style.display = "block";
+  barkTimer = 2.5;
+}
+const BARKS = {
+  catch: ["별고기를 낚았어!", "잡았다! 반짝이는 별고기야!", "낚시 대성공!"],
+  scare: ["너무 빨랐어, 물고기가 도망갔어!", "아쉽다, 조금만 더 기다릴 걸!"],
+  quest: ["의뢰 완료!", "잘했어!"],
+};
+
+function refreshHud() {
+  zoneEl.textContent = `구역: ${state.player.y < 0 ? (Math.abs(state.player.x) <= 1 ? "선착장" : "호수") : "호숫가"}`;
+  scoreEl.textContent = `점수: ${state.score} · 낚은 고기: ${state.caught.length}마리 · 던진 횟수: ${state.casts}`;
+  questsEl.innerHTML = state.quests.map((q) =>
+    `<div class="${q.done ? "done" : "todo"}">${q.done ? "✓" : "·"} ${q.name}${q.type === "quest.catch" ? ` (${q.progress}/3)` : ""}</div>`
+  ).join("");
+  npcsEl.textContent = "물고기: " + state.fish.map((f) => `${f.id}:${f.state === "caught" ? "낚임" : f.state === "chase" ? "미끼로" : f.state === "flee" ? "도망" : "헤엄"}`).join(" · ");
+  posEl.textContent = `위치: (${state.player.x.toFixed(1)}, ${state.player.y.toFixed(1)})`;
+  const fs = state.fishing;
+  phaseEl.textContent =
+    fs.phase === "waiting" ? "기다리는 중… 물고기가 올 때까지 기다리세요." :
+    fs.phase === "bite" ? "물었다! 지금 스페이스바(챔질)!" :
+    fs.phase === "cooldown" ? "물고기를 놀라게 했어. 잠시 뒤 다시 던지세요." :
+    "선착장 끝으로 가서 E를 눌러 찌를 던지세요.";
+  const angler = state.npcs.find((n) => n.id === "angler-1");
+  const talkQuest = state.quests.find((q) => q.type === "quest.talk");
+  const near = angler && Math.hypot(state.player.x - angler.x, state.player.y - angler.y) < 1.5;
+  promptEl.style.display = (talkQuest && !talkQuest.done && near) ? "block" : "none";
+}
+
+// --- Main loop (fixed step 1/60). ---
+let last = performance.now();
+let acc = 0;
+let lastSave = 0;
+const wasDone = new Map(state.quests.map((q) => [q.id, q.done]));
+let prevCaught = state.caught.length;
+let prevPhase = state.fishing.phase;
+
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min((now - last) / 1000, 0.1);
+  last = now;
+  acc += dt;
+  let stepped = false;
+  while (acc >= TICK) {
+    acc -= TICK;
+    state = step(state, readInput(), rng, world);
+    stepped = true;
+  }
+  if (stepped) {
+    for (const q of state.quests) {
+      if (q.done && !wasDone.get(q.id)) { showBark(barkRng.pick(BARKS.quest)); saveGame("의뢰 완료, 저장됨"); }
+    }
+    if (state.caught.length > prevCaught) {
+      prevCaught = state.caught.length;
+      showBark(barkRng.pick(BARKS.catch));
+      saveGame("고기 낚음, 저장됨");
+    }
+    if (prevPhase === "waiting" && state.fishing.phase === "cooldown") showBark(barkRng.pick(BARKS.scare));
+    prevPhase = state.fishing.phase;
+    if (now - lastSave > 5000) { saveGame(); lastSave = now; }
+    refreshHud();
+  }
+  if (barkTimer > 0) { barkTimer -= dt; if (barkTimer <= 0) barkEl.style.display = "none"; }
+
+  // Render.
+  playerGroup.position.set(state.player.x, 0, state.player.y);
+  for (const n of state.npcs) {
+    const m = anglerMeshes.get(n.id);
+    if (m) m.position.set(n.x, 0, n.y);
+  }
+  for (const f of state.fish) {
+    const m = fishMeshes.get(f.id);
+    if (!m) continue;
+    m.visible = f.state !== "caught";
+    if (m.visible) {
+      m.position.set(f.x, -0.15, f.y);
+      m.rotation.y += dt * 0.5;
+    }
+  }
+  const fs = state.fishing;
+  if (fs.bobber) {
+    bobberMesh.visible = true;
+    const bob = fs.phase === "bite" ? Math.sin(now / 90) * 0.12 : 0;
+    bobberMesh.position.set(fs.bobber.x, 0.35 + bob, fs.bobber.y);
+  } else {
+    bobberMesh.visible = false;
+  }
+  camera.position.set(state.player.x + 2, 16, state.player.y + 14);
+  camera.lookAt(state.player.x + 2, 0, state.player.y - 2);
+  renderer.render(scene, camera);
+}
+
+window.__STAR_FISHING__ = {
+  get state() { return state; },
+  get hash() { return stateHash(state); },
+  world, saveKey: SAVE_KEY,
+};
+refreshHud();
+requestAnimationFrame(frame);
+
+window.addEventListener("resize", () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>

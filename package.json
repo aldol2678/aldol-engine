@@ -1,1 +1,1 @@
-{"description":"Aldol Engine — aldol.js 기반 웹 게임 엔진 (Three.js / WebGL2). M1 첫 게임: 수풀리.","engines":{"node":">=20"},"name":"aldol-engine","private":true,"scripts":{"check":"node tools/check.mjs","simulate":"node src/simulate-cli.mjs"},"type":"module","version":"0.1.0"}
+{"description":"Aldol Engine — aldol.js 기반 웹 게임 엔진 (Three.js / WebGL2). M1 첫 게임: 수풀리.","engines":{"node":">=20"},"name":"aldol-engine","private":true,"scripts":{"check":"node tools/check.mjs","check:fishing":"node tools/check-fishing.mjs","simulate":"node src/simulate-cli.mjs"},"type":"module","version":"0.1.0"}

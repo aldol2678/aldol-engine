@@ -128,6 +128,9 @@ export function worldToSim(world) {
   const scarecrows = world.entities
     .filter((e) => e.type === "entity.scarecrow" && e.enabled !== false)
     .map((e) => ({ id: e.id, ...toSim(e.transform.position) }));
+  const reeds = world.entities
+    .filter((e) => e.type === "entity.reed" && e.enabled !== false)
+    .map((e) => ({ id: e.id, ...toSim(e.transform.position) }));
 
   const npcs = world.npcs.map((n) => {
     const ent = entities.get(n.entityId);
@@ -145,6 +148,7 @@ export function worldToSim(world) {
       interaction: n.behavior?.interaction || "talk",
       sight: n.behavior?.params?.sight ?? 6,
       damage: n.behavior?.params?.damage ?? 0,
+      params: n.behavior?.params ?? {},
     };
   });
 
@@ -155,9 +159,11 @@ export function worldToSim(world) {
   });
   const combatRule = world.rules.find((r) => r.type === "game.combat" && r.enabled);
   const combat = combatRule ? combatRule.config : { contactDamage: 10, contactCooldownTicks: 60, playerHp: 100, fleeHp: 25 };
+  const fishingRule = world.rules.find((r) => r.type === "game.fishing" && r.enabled !== false);
+  const fishing = fishingRule ? fishingRule.config : null;
 
   const placeMap = {};
   for (const p of world.places) placeMap[p.id] = toSim(p.position);
 
-  return { worldId: world.world.id, bounds: { minX, maxX, minY, maxY }, waypoints, edges, houses, trees, shards, crops, herbs, scarecrows, npcs, spawn, quests, combat, places: placeMap };
+  return { worldId: world.world.id, bounds: { minX, maxX, minY, maxY }, waypoints, edges, houses, trees, shards, crops, herbs, scarecrows, reeds, npcs, spawn, quests, combat, fishing, places: placeMap };
 }
