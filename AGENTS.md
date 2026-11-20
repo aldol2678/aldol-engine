@@ -25,6 +25,12 @@
 - `tools/hooks/pre-push`가 `npm run check:all`을 돌리고, 실패하면 푸시를 막는다. 클론마다 한 번 `sh tools/install-hooks.sh`로 설치한다 (git 훅은 버전 관리가 안 되니까 체크인된 스크립트를 심링크로 건다).
 - 스냅샷 푸시(push-files)에는 git 훅이 안 걸리니까, 그때는 푸시 전에 `npm run check:all`을 직접 돌린다.
 
+## CI (임시 셀프호스트 러너)
+- GitHub-hosted 분이 소진돼서 클라우드 CI는 못 쓰지만, 번 VM2(`aldol-burn-vm2`, n2-standard-16, 미국 중부)에 셀프호스트 러너가 떠 있다. 프라이빗 레포라 포함 분을 안 먹는다.
+- `.github/workflows/check.yml`이 main 푸시/PR 때 `npm run check:all`을 러너에서 돌린다. 러너 라벨 `burn-vm2`.
+- 설치 스크립트 `tools/ci/install-runner-vm2.sh` (전용 비-root 계정 `actions-runner`로 설치 — config.sh가 root를 거부한다). 토큰은 1시간짜리 등록 토큰이라 재설치 때는 새로 받아야 한다.
+- 임시 러너다: VM2가 2026-11-26 00:00 KST에 자동 삭제되면 러너도 같이 사라진다. 그 뒤엔 로컬 pre-push 훅만 남는다.
+
 ## 결정성 규칙 (절대)
 1. 시뮬레이션 경로는 순수 함수다. 렌더링·입력 장치·벽시계를 받지 않는다.
 2. 무작위성은 `src/core/rng.js`의 시드 RNG만 쓴다. `Math.random()`·`Date.now()`·`performance.now()`를 `src/core/`에서 쓰면 `npm run check`가 실패한다.
