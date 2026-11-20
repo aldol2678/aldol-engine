@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>수풀리 M1 — 마을 1맵 슬라이스 | Aldol Engine</title>
+<title>수풀리 M1 — 마을 + 숲입구 | Aldol Engine</title>
 <style>
   html, body { margin: 0; height: 100%; overflow: hidden; background: #101a12; font-family: system-ui, sans-serif; }
   #app { position: fixed; inset: 0; }
@@ -12,6 +12,8 @@
   .panel h1 { font-size: 15px; margin: 0 0 4px; }
   .panel p { font-size: 13px; margin: 2px 0; }
   .panel .done { color: #9be49b; }
+  .hpbar { height: 8px; background: #333; border-radius: 4px; overflow: hidden; margin: 4px 0; }
+  .hpbar > div { height: 100%; background: #e05252; width: 100%; }
   #bark { position: absolute; left: 50%; bottom: 92px; transform: translateX(-50%); background: #fffbe8; color: #222; border-radius: 12px; padding: 8px 14px; font-size: 14px; display: none; max-width: 80vw; box-shadow: 0 2px 10px rgba(0,0,0,.35); }
   #prompt { position: absolute; left: 50%; bottom: 48px; transform: translateX(-50%); background: rgba(0,0,0,.65); color: #fff; border-radius: 8px; padding: 6px 12px; font-size: 14px; display: none; }
   #help { position: absolute; right: 12px; bottom: 12px; color: #cfe3cf; background: rgba(16,26,18,.7); padding: 6px 10px; border-radius: 8px; font-size: 12px; }
@@ -23,9 +25,12 @@
 <body>
 <div id="app"></div>
 <div class="panel">
-  <h1>수풀리 M1 — 마을 슬라이스</h1>
-  <p id="quest">의뢰: 이웃 주민과 대화하기</p>
-  <p id="npc-state">주민 상태: 순찰</p>
+  <h1>수풀리 M1 — 마을 + 숲입구</h1>
+  <p id="zone">구역: 마을</p>
+  <div class="hpbar"><div id="hpfill"></div></div>
+  <p id="hp">체력: 100</p>
+  <div id="quests"></div>
+  <p id="npc-state">주민: 순찰</p>
   <p id="pos">위치: (0.0, 0.0)</p>
   <p id="save-state">저장: —</p>
 </div>
@@ -35,32 +40,55 @@
 <script type="module">
 import * as THREE from "three";
 import { Rng } from "../../src/core/rng.js";
-import { createInitialState, step, simulate, WAYPOINTS, STEP } from "../../src/core/sim.js";
+import { createInitialState, step, simulate, STEP } from "../../src/core/sim.js";
 import { stateHash } from "../../src/core/state-hash.js";
+import { validateWorldManifest, worldToSim } from "../../src/core/worldforge.js";
 
 const SEED = "supuli-m1";
-const SAVE_KEY = "aldol-engine.supuli-m1.save.v1";
+const SAVE_KEY = "aldol-engine.supuli-m1.save.v2";
+
+// --- load the WorldForge manifest (single source of truth for the map) ---
+const manifest = await fetch("./world.json").then((r) => r.json());
+const validation = validateWorldManifest(manifest);
+if (!validation.valid) {
+  document.body.innerHTML = "<pre>world.json invalid: " + JSON.stringify(validation.errors, null, 2) + "</pre>";
+  throw new Error("world manifest invalid");
+}
+const world = worldToSim(manifest);
 
 const BARKS = {
   patrol: ["오늘 날씨 참 좋지.", "마을은 평화로워야 해.", "길을 잃었나? 마을은 작아."],
   chase: ["어? 누구야, 거기!", "잠깐, 너 누구야?", "이쪽으로 와 봐."],
   flee: ["살려줘! 도망가야 해!", "너무 무서워…", "저리 가!"],
+  boar: ["꿀꿀!", "크르릉…", "꿀꿀꿀!"],
   quest: ["고마워! 마을을 잘 부탁해.", "너라면 수풀을 지킬 수 있을 거야."],
 };
 const STATE_LABEL = { patrol: "순찰", chase: "추격", flee: "도망" };
 
-// --- state (save is a snapshot, not a seed: it restores position + quest) ---
-let state = createInitialState(SEED);
+// --- state (save is a snapshot, not a seed: it restores position + progress) ---
+let state = createInitialState(SEED, world);
 const saved = (() => { try { return JSON.parse(localStorage.getItem(SAVE_KEY)); } catch { return null; } })();
 if (saved && saved.player) {
   state.player.x = saved.player.x;
   state.player.y = saved.player.y;
-  if (saved.questDone) state.quest.done = true;
+  state.player.hp = saved.player.hp ?? world.combat.playerHp;
+  if (Array.isArray(saved.quests)) {
+    for (const sq of saved.quests) {
+      const q = state.quests.find((x) => x.id === sq.id);
+      if (q) { q.done = !!sq.done; q.progress = sq.progress || 0; }
+    }
+  }
+  if (Array.isArray(saved.shards)) {
+    for (const ss of saved.shards) {
+      const s = state.shards.find((x) => x.id === ss.id);
+      if (s) s.collected = !!ss.collected;
+    }
+  }
   document.getElementById("save-state").textContent = "저장: 불러옴";
 }
 const barkRng = new Rng(SEED).fork("bark");
 
-// --- three.js scene ---
+// --- three.js scene (built from the manifest) ---
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
@@ -68,7 +96,7 @@ document.getElementById("app").appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x9fc5e8);
-scene.fog = new THREE.Fog(0x9fc5e8, 25, 60);
+scene.fog = new THREE.Fog(0x9fc5e8, 30, 70);
 const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 100);
 
 scene.add(new THREE.HemisphereLight(0xffffff, 0x3a5f3a, 1.1));
@@ -76,16 +104,27 @@ const sun = new THREE.DirectionalLight(0xfff2cc, 1.4);
 sun.position.set(8, 14, 6);
 scene.add(sun);
 
+const { bounds } = world;
+const cx = (bounds.minX + bounds.maxX) / 2;
+const cy = (bounds.minY + bounds.maxY) / 2;
 const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(24, 18),
+  new THREE.PlaneGeometry(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY),
   new THREE.MeshStandardMaterial({ color: 0x5da85d })
 );
 ground.rotation.x = -Math.PI / 2;
-ground.position.set(2, 0, 3);
+ground.position.set(cx, 0, cy);
 scene.add(ground);
+// Forest floor (darker patch over the forest zone).
+const forest = new THREE.Mesh(
+  new THREE.PlaneGeometry(6, 10),
+  new THREE.MeshStandardMaterial({ color: 0x3d7a3d })
+);
+forest.rotation.x = -Math.PI / 2;
+forest.position.set(13, 0.01, 3);
+scene.add(forest);
 
 // Waypoint markers.
-for (const wp of WAYPOINTS) {
+for (const wp of world.waypoints) {
   const dot = new THREE.Mesh(
     new THREE.CircleGeometry(0.28, 16),
     new THREE.MeshBasicMaterial({ color: 0xffe066 })
@@ -95,9 +134,8 @@ for (const wp of WAYPOINTS) {
   scene.add(dot);
 }
 
-// Village houses (boxes + prism roofs).
-const houseSpots = [[-4, -1], [6, -1], [-3, 5], [9, 4], [2, 7]];
-for (const [hx, hy] of houseSpots) {
+// Houses from the manifest.
+for (const h of world.houses) {
   const house = new THREE.Group();
   const body = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.6, 2), new THREE.MeshStandardMaterial({ color: 0xd8b58c }));
   body.position.y = 0.8;
@@ -105,22 +143,51 @@ for (const [hx, hy] of houseSpots) {
   roof.position.y = 2.15;
   roof.rotation.y = Math.PI / 4;
   house.add(body, roof);
-  house.position.set(hx, 0, hy);
+  house.position.set(h.x, 0, h.y);
   scene.add(house);
 }
 
-function makePerson(color) {
+// Trees from the manifest.
+for (const t of world.trees) {
+  const tree = new THREE.Group();
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.25, 1.2, 8), new THREE.MeshStandardMaterial({ color: 0x7a4a21 }));
+  trunk.position.y = 0.6;
+  const leaves = new THREE.Mesh(new THREE.ConeGeometry(1.1, 2.2, 8), new THREE.MeshStandardMaterial({ color: 0x2e6b2e }));
+  leaves.position.y = 2.1;
+  tree.add(trunk, leaves);
+  tree.position.set(t.x, 0, t.y);
+  scene.add(tree);
+}
+
+// Star shards from the manifest (hidden once collected).
+const shardMeshes = new Map();
+for (const s of world.shards) {
+  const shard = new THREE.Mesh(
+    new THREE.OctahedronGeometry(0.45),
+    new THREE.MeshStandardMaterial({ color: 0xffd700, emissive: 0xaa8800, metalness: 0.6, roughness: 0.3 })
+  );
+  shard.position.set(s.x, 0.9, s.y);
+  scene.add(shard);
+  shardMeshes.set(s.id, shard);
+}
+
+function makePerson(color, scale = 1) {
   const g = new THREE.Group();
   const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.32, 0.7, 4, 8), new THREE.MeshStandardMaterial({ color }));
   body.position.y = 0.75;
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 16, 12), new THREE.MeshStandardMaterial({ color: 0xf2c9a0 }));
   head.position.y = 1.55;
   g.add(body, head);
+  g.scale.setScalar(scale);
   scene.add(g);
   return g;
 }
 const playerMesh = makePerson(0x2e7d32);
-const npcMesh = makePerson(0xe67e22);
+const npcMeshes = new Map();
+for (const n of world.npcs) {
+  const isBoar = n.interaction === "hostile";
+  npcMeshes.set(n.id, makePerson(isBoar ? 0x5d4037 : 0xe67e22, isBoar ? 1.15 : 1));
+}
 
 // --- input ---
 const keys = {};
@@ -157,7 +224,10 @@ function readInput() {
 function saveGame(note) {
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify({
-      player: state.player, questDone: state.quest.done, tick: state.tick, savedAt: Date.now(),
+      player: state.player,
+      quests: state.quests.map((q) => ({ id: q.id, done: q.done, progress: q.progress })),
+      shards: state.shards.map((s) => ({ id: s.id, collected: s.collected })),
+      tick: state.tick, savedAt: Date.now(),
     }));
     document.getElementById("save-state").textContent = `저장: ${note || "저장됨"}`;
   } catch { /* storage unavailable: game still runs */ }
@@ -166,26 +236,33 @@ setInterval(() => saveGame("자동 저장됨"), 5000);
 addEventListener("beforeunload", () => saveGame("저장됨"));
 
 // --- HUD + bark ---
-const questEl = document.getElementById("quest");
+const questsEl = document.getElementById("quests");
 const npcEl = document.getElementById("npc-state");
 const posEl = document.getElementById("pos");
+const hpEl = document.getElementById("hp");
+const hpFill = document.getElementById("hpfill");
+const zoneEl = document.getElementById("zone");
 const barkEl = document.getElementById("bark");
 const promptEl = document.getElementById("prompt");
 let barkTimer = 0;
-let prevNpcState = state.npc.state;
+const prevNpcState = new Map(state.npcs.map((n) => [n.id, n.state]));
 function showBark(text) {
   barkEl.textContent = text;
   barkEl.style.display = "block";
   barkTimer = 2.5;
 }
 function refreshHud() {
-  questEl.innerHTML = state.quest.done
-    ? `<span class="done">의뢰 완료: ${state.quest.title} ✔</span>`
-    : `의뢰: ${state.quest.title}`;
-  npcEl.textContent = `주민 상태: ${STATE_LABEL[state.npc.state] || state.npc.state}`;
+  questsEl.innerHTML = state.quests.map((q) =>
+    q.done ? `<p><span class="done">✔ ${q.name}</span></p>` : `<p>· ${q.name}${q.progress ? ` (${q.progress})` : ""}</p>`).join("");
+  npcEl.textContent = state.npcs.map((n) => `${n.name}: ${STATE_LABEL[n.state] || n.state}`).join(" · ");
   posEl.textContent = `위치: (${state.player.x.toFixed(1)}, ${state.player.y.toFixed(1)})`;
-  const dist = Math.hypot(state.player.x - state.npc.x, state.player.y - state.npc.y);
-  promptEl.style.display = (!state.quest.done && dist < 1.5) ? "block" : "none";
+  hpEl.textContent = `체력: ${state.player.hp}`;
+  hpFill.style.width = `${Math.max(0, state.player.hp)}%`;
+  zoneEl.textContent = `구역: ${state.player.x >= 10 ? "숲 입구" : "마을"}`;
+  const villager = state.npcs.find((n) => n.interaction === "talk");
+  const dist = villager ? Math.hypot(state.player.x - villager.x, state.player.y - villager.y) : 99;
+  const talkQuest = state.quests.find((q) => q.type === "quest.talk");
+  promptEl.style.display = (talkQuest && !talkQuest.done && dist < 1.5) ? "block" : "none";
 }
 
 // --- main loop: fixed-step accumulator, render from sim state ---
@@ -199,19 +276,37 @@ function frame(now) {
   const input = readInput();
   let stepped = false;
   while (acc >= STEP) {
-    const before = state.npc.state;
-    const wasDone = state.quest.done;
-    state = step(state, input, barkRng);
+    const before = new Map(state.npcs.map((n) => [n.id, n.state]));
+    const wasDone = new Map(state.quests.map((q) => [q.id, q.done]));
+    const hpBefore = state.player.hp;
+    state = step(state, input, barkRng, world);
     stepped = true;
     acc -= STEP;
-    if (state.npc.state !== before) showBark(barkRng.pick(BARKS[state.npc.state]));
-    if (state.quest.done && !wasDone) { showBark(barkRng.pick(BARKS.quest)); saveGame("의뢰 완료, 저장됨"); }
+    for (const n of state.npcs) {
+      if (n.state !== before.get(n.id)) {
+        const pool = n.interaction === "hostile" ? BARKS.boar : BARKS[n.state];
+        showBark(barkRng.pick(pool));
+      }
+    }
+    for (const q of state.quests) {
+      if (q.done && !wasDone.get(q.id)) { showBark(barkRng.pick(BARKS.quest)); saveGame("의뢰 완료, 저장됨"); }
+    }
+    if (state.player.hp < hpBefore) showBark("아야! 멧돼지에게 받혔어!");
   }
   if (stepped) refreshHud();
   if (barkTimer > 0) { barkTimer -= dt; if (barkTimer <= 0) barkEl.style.display = "none"; }
 
   playerMesh.position.set(state.player.x, 0, state.player.y);
-  npcMesh.position.set(state.npc.x, 0, state.npc.y);
+  for (const n of state.npcs) {
+    const mesh = npcMeshes.get(n.id);
+    if (mesh) mesh.position.set(n.x, 0, n.y);
+  }
+  for (const s of state.shards) {
+    const mesh = shardMeshes.get(s.id);
+    if (!mesh) continue;
+    mesh.visible = !s.collected;
+    if (mesh.visible) mesh.rotation.y += dt * 2;
+  }
   camera.position.set(state.player.x, 9, state.player.y + 9);
   camera.lookAt(state.player.x, 0, state.player.y);
   renderer.render(scene, camera);
@@ -224,13 +319,12 @@ addEventListener("resize", () => {
 refreshHud();
 requestAnimationFrame(frame);
 
-// QA hook: window.__SUPULI_M1__ = { state, hash, simulate, saveKey }
+// QA hook: window.__SUPULI_M1__ = { state, hash, world, simulate, saveKey }
 window.__SUPULI_M1__ = {
   get state() { return state; },
   get hash() { return stateHash(state); },
-  simulate, saveKey: SAVE_KEY,
+  world, simulate, saveKey: SAVE_KEY,
 };
-
 </script>
 </body>
 </html>
