@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>수풀리 M1 — 마을 + 숲입구 | Aldol Engine</title>
+<title>수풀리 M1 — 마을 + 숲입구 + 숲 깊은 곳 | Aldol Engine</title>
 <style>
   html, body { margin: 0; height: 100%; overflow: hidden; background: #101a12; font-family: system-ui, sans-serif; }
   #app { position: fixed; inset: 0; }
@@ -25,7 +25,7 @@
 <body>
 <div id="app"></div>
 <div class="panel">
-  <h1>수풀리 M1 — 마을 + 숲입구</h1>
+  <h1>수풀리 M1 — 마을 + 숲입구 + 숲 깊은 곳</h1>
   <p id="zone">구역: 마을</p>
   <div class="hpbar"><div id="hpfill"></div></div>
   <p id="hp">체력: 100</p>
@@ -36,7 +36,11 @@
 </div>
 <div id="bark"></div>
 <div id="prompt">E: 대화하기</div>
-<div id="help">WASD/방향키 이동 · E 대화 · 드래그 이동(터치)</div>
+<div id="attack-btn">⚔ 공격</div>
+<div id="help">WASD/방향키 이동 · E 대화 · 스페이스바 공격 · 드래그 이동(터치)</div>
+<style>
+  #attack-btn { position: absolute; right: 16px; bottom: 56px; width: 72px; height: 72px; border-radius: 50%; background: rgba(180, 60, 60, 0.85); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: bold; user-select: none; touch-action: none; }
+</style>
 <script type="module">
 import * as THREE from "three";
 import { Rng } from "../../src/core/rng.js";
@@ -45,7 +49,7 @@ import { stateHash } from "../../src/core/state-hash.js";
 import { validateWorldManifest, worldToSim } from "../../src/core/worldforge.js";
 
 const SEED = "supuli-m1";
-const SAVE_KEY = "aldol-engine.supuli-m1.save.v2";
+const SAVE_KEY = "aldol-engine.supuli-m1.save.v3";
 
 // --- load the WorldForge manifest (single source of truth for the map) ---
 const manifest = await fetch("./world.json").then((r) => r.json());
@@ -61,9 +65,11 @@ const BARKS = {
   chase: ["어? 누구야, 거기!", "잠깐, 너 누구야?", "이쪽으로 와 봐."],
   flee: ["살려줘! 도망가야 해!", "너무 무서워…", "저리 가!"],
   boar: ["꿀꿀!", "크르릉…", "꿀꿀꿀!"],
+  guardian: ["크아아!", "숲을 더럽히지 마!", "돌아가라, 침입자야!"],
+  hit: ["맞혔다!", "제대로 들어갔어!"],
   quest: ["고마워! 마을을 잘 부탁해.", "너라면 수풀을 지킬 수 있을 거야."],
 };
-const STATE_LABEL = { patrol: "순찰", chase: "추격", flee: "도망" };
+const STATE_LABEL = { patrol: "순찰", chase: "추격", flee: "도망", defeated: "처치됨" };
 
 // --- state (save is a snapshot, not a seed: it restores position + progress) ---
 let state = createInitialState(SEED, world);
@@ -122,6 +128,14 @@ const forest = new THREE.Mesh(
 forest.rotation.x = -Math.PI / 2;
 forest.position.set(13, 0.01, 3);
 scene.add(forest);
+// Deep forest floor (darkest patch).
+const deepForest = new THREE.Mesh(
+  new THREE.PlaneGeometry(8, 10),
+  new THREE.MeshStandardMaterial({ color: 0x2e5d2e })
+);
+deepForest.rotation.x = -Math.PI / 2;
+deepForest.position.set(20, 0.01, 3);
+scene.add(deepForest);
 
 // Waypoint markers.
 for (const wp of world.waypoints) {
@@ -184,18 +198,26 @@ function makePerson(color, scale = 1) {
 }
 const playerMesh = makePerson(0x2e7d32);
 const npcMeshes = new Map();
+const NPC_STYLE = {
+  "villager-1": { color: 0xe67e22, scale: 1 },
+  "boar-1": { color: 0x5d4037, scale: 1.15 },
+  "elder-1": { color: 0x5b7fa6, scale: 1 },
+  "guardian-1": { color: 0x6a1b9a, scale: 1.3 },
+};
 for (const n of world.npcs) {
-  const isBoar = n.interaction === "hostile";
-  npcMeshes.set(n.id, makePerson(isBoar ? 0x5d4037 : 0xe67e22, isBoar ? 1.15 : 1));
+  const style = NPC_STYLE[n.id] || { color: 0xe67e22, scale: 1 };
+  npcMeshes.set(n.id, makePerson(style.color, style.scale));
 }
 
 // --- input ---
 const keys = {};
 let interactPressed = false;
+let attackPressed = false;
 let touchVec = { x: 0, y: 0 };
 addEventListener("keydown", (e) => {
   keys[e.key.toLowerCase()] = true;
   if (e.key.toLowerCase() === "e") interactPressed = true;
+  if (e.code === "Space") { attackPressed = true; e.preventDefault(); }
 });
 addEventListener("keyup", (e) => { keys[e.key.toLowerCase()] = false; });
 let dragStart = null;
@@ -205,6 +227,7 @@ renderer.domElement.addEventListener("pointermove", (e) => {
   touchVec = { x: (e.clientX - dragStart.x) / 40, y: (e.clientY - dragStart.y) / 40 };
 });
 addEventListener("pointerup", () => { dragStart = null; touchVec = { x: 0, y: 0 }; });
+document.getElementById("attack-btn").addEventListener("pointerdown", (e) => { attackPressed = true; e.preventDefault(); });
 
 function readInput() {
   // Screen mapping: camera sits at +z looking -z, so W (up-screen) = +y, S = -y.
@@ -216,7 +239,9 @@ function readInput() {
   if (len > 1) { dx /= len; dy /= len; }
   const input = { dx, dy };
   if (interactPressed) input.interact = true;
+  if (attackPressed) input.attack = true;
   interactPressed = false;
+  attackPressed = false;
   return input;
 }
 
@@ -245,6 +270,7 @@ const zoneEl = document.getElementById("zone");
 const barkEl = document.getElementById("bark");
 const promptEl = document.getElementById("prompt");
 let barkTimer = 0;
+let prevHitTick = null;
 const prevNpcState = new Map(state.npcs.map((n) => [n.id, n.state]));
 function showBark(text) {
   barkEl.textContent = text;
@@ -258,7 +284,7 @@ function refreshHud() {
   posEl.textContent = `위치: (${state.player.x.toFixed(1)}, ${state.player.y.toFixed(1)})`;
   hpEl.textContent = `체력: ${state.player.hp}`;
   hpFill.style.width = `${Math.max(0, state.player.hp)}%`;
-  zoneEl.textContent = `구역: ${state.player.x >= 10 ? "숲 입구" : "마을"}`;
+  zoneEl.textContent = `구역: ${state.player.x >= 16 ? "숲 깊은 곳" : state.player.x >= 10 ? "숲 입구" : "마을"}`;
   const villager = state.npcs.find((n) => n.interaction === "talk");
   const dist = villager ? Math.hypot(state.player.x - villager.x, state.player.y - villager.y) : 99;
   const talkQuest = state.quests.find((q) => q.type === "quest.talk");
@@ -284,9 +310,13 @@ function frame(now) {
     acc -= STEP;
     for (const n of state.npcs) {
       if (n.state !== before.get(n.id)) {
-        const pool = n.interaction === "hostile" ? BARKS.boar : BARKS[n.state];
+        const pool = n.id === "guardian-1" ? BARKS.guardian : n.interaction === "hostile" ? BARKS.boar : BARKS[n.state];
         showBark(barkRng.pick(pool));
       }
+    }
+    if (state.lastHit && (!prevHitTick || state.lastHit.tick !== prevHitTick)) {
+      prevHitTick = state.lastHit.tick;
+      showBark(barkRng.pick(BARKS.hit));
     }
     for (const q of state.quests) {
       if (q.done && !wasDone.get(q.id)) { showBark(barkRng.pick(BARKS.quest)); saveGame("의뢰 완료, 저장됨"); }
@@ -299,7 +329,9 @@ function frame(now) {
   playerMesh.position.set(state.player.x, 0, state.player.y);
   for (const n of state.npcs) {
     const mesh = npcMeshes.get(n.id);
-    if (mesh) mesh.position.set(n.x, 0, n.y);
+    if (!mesh) continue;
+    mesh.visible = n.state !== "defeated";
+    if (mesh.visible) mesh.position.set(n.x, 0, n.y);
   }
   for (const s of state.shards) {
     const mesh = shardMeshes.get(s.id);

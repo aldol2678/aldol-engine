@@ -3,7 +3,7 @@
 이 저장소에서 일하는 에이전트(Moa·Ark·Naru 등)의 계약. 게임보다 먼저다.
 
 ## 목적
-- aldol.js 기반 웹 게임 엔진. M1 첫 게임은 **수풀리** (마을 1맵 슬라이스 → 2026-11-20 확장: 마을 + 숲입구, 의뢰 3개, 전투 라이트).
+- aldol.js 기반 웹 게임 엔진. M1 첫 게임은 **수풀리** (마을 1맵 슬라이스 → 2026-11-20 확장: 마을 + 숲입구 + 숲 깊은 곳, 의뢰 6개, 전투 공격/처치).
 - Three.js 0.160.0, WebGL2 기본. 라이선스는 UNLICENSED (M3 전 MIT).
 - 배포는 Cloudflare Pages만. `latest` 태그는 쓰지 않는다.
 
@@ -32,7 +32,7 @@
 - 매니페스트가 바뀌면 `npm run check`의 매니페스트 검증이 먼저 잡는다. 검증 실패한 월드는 게임이 시작 전에 멈춘다.
 
 ## AI 최소 집합 (M1)
-- FSM 3상태: 순찰(patrol) · 추격(chase) · 도망(flee). 전이 조건은 `src/core/sim.js`에 표로 적는다.
+- FSM 4상태: 순찰(patrol) · 추격(chase) · 도망(flee) · 처치됨(defeated, 10초 뒤 집에서 리스폰). 전이 조건은 `src/core/sim.js`에 표로 적는다.
 - 스티어링 seek/flee/wander + arrive.
 - 웨이포인트 그래프 A* (`NavProvider` 인터페이스만 본다. M1 구현은 웨이포인트, M2에서 내비메시로 교체).
 - 작성된 대사(bark) 풀 — LLM 없이 시드 RNG로 고른다.

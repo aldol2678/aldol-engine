@@ -7,7 +7,9 @@
 // NPC FSM transitions (per npc):
 //   patrol -> chase : distance(player) < sight
 //   chase  -> patrol: distance(player) > sight + 3
-//   any    -> flee  : npc.hp <= fleeHp (combat rule)
+//   any    -> flee  : 0 < npc.hp <= fleeHp (combat rule)
+//   any    -> defeated: npc.hp <= 0 (player attack)
+//   defeated -> patrol: after npcRespawnTicks, respawn at home with full HP
 //   flee   -> patrol: npc.hp > fleeHp and distance(player) > sight + 3
 // Steering: seek + arrive. AI ticks every step here (10-20Hz tick is a
 // renderer-side optimisation; the sim itself is deterministic either way).
@@ -16,8 +18,11 @@
 //   quest.talk    — input.interact within range of the named NPC.
 //   quest.collect — walk within 1.0 of an uncollected shard.
 //   quest.arrive  — walk within range of the named place.
+//   quest.defeat  — the named NPC's HP reaches 0 (player attack).
 // Combat-lite (rule game.combat): a hostile NPC in chase state touching the
 // player (dist < 0.8) deals contactDamage, once per contactCooldownTicks.
+// Player attack (input.attack): nearest hostile NPC within attackRange takes
+// playerAttackDamage, once per attackCooldownTicks.
 // Player HP 0 -> respawn at spawn with full HP (quest progress is kept).
 
 import { Rng } from "./rng.js";
@@ -43,10 +48,10 @@ export const DEFAULT_WORLD = {
   houses: [],
   trees: [],
   shards: [],
-  npcs: [{ id: "villager-1", name: "마을 주민", x: 8, y: 6, hp: 100, homePlaceId: null, interaction: "talk", sight: 6, damage: 0 }],
+  npcs: [{ id: "villager-1", name: "마을 주민", x: 8, y: 6, homeX: 4, homeY: 3, hp: 100, homePlaceId: null, interaction: "talk", sight: 6, damage: 0 }],
   spawn: { x: 0, y: 0 },
   quests: [{ id: "talk-to-villager", name: "이웃 주민과 대화하기", type: "quest.talk", nodes: [{ id: "talk", type: "quest.talk", params: { npcId: "villager-1", range: 1.5 } }], edges: [], params: new Map() }],
-  combat: { contactDamage: 10, contactCooldownTicks: 60, playerHp: 100, fleeHp: 25 },
+  combat: { contactDamage: 10, contactCooldownTicks: 60, playerHp: 100, fleeHp: 25, playerAttackDamage: 20, attackRange: 1.2, attackCooldownTicks: 30, npcRespawnTicks: 600 },
   places: {},
 };
 
@@ -105,8 +110,12 @@ export function createInitialState(seed, world = DEFAULT_WORLD) {
       name: n.name,
       x: n.x,
       y: n.y,
+      homeX: n.homeX ?? n.x,
+      homeY: n.homeY ?? n.y,
       state: "patrol",
       hp: n.hp,
+      maxHp: n.hp,
+      defeatedTimer: 0,
       interaction: n.interaction,
       sight: n.sight,
       damage: n.damage,
@@ -116,11 +125,13 @@ export function createInitialState(seed, world = DEFAULT_WORLD) {
     shards: world.shards.map((s) => ({ id: s.id, x: s.x, y: s.y, collected: false })),
     quests: world.quests.map((q) => ({ id: q.id, name: q.name, type: q.type, done: false, progress: 0 })),
     combatCooldown: 0,
+    attackCooldown: 0,
+    lastHit: null,
     rngNote: `patrol target picked by fork('ai:patrol') from seed ${rng.seedString}`,
   };
 }
 
-// One fixed step. `input` is {dx, dy, interact?} with dx/dy in [-1, 1].
+// One fixed step. `input` is {dx, dy, interact?, attack?} with dx/dy in [-1, 1].
 // Pure function of (state, input, rng, world).
 export function step(state, input, rng, world = DEFAULT_WORLD) {
   const next = structuredClone(state);
@@ -136,8 +147,38 @@ export function step(state, input, rng, world = DEFAULT_WORLD) {
   next.player.x = Math.max(bounds.minX, Math.min(bounds.maxX, nx));
   next.player.y = Math.max(bounds.minY, Math.min(bounds.maxY, ny));
 
+  // Player attack: nearest hostile NPC within range takes damage.
+  if (next.attackCooldown > 0) next.attackCooldown -= 1;
+  if (input.attack && next.attackCooldown === 0) {
+    const range = world.combat.attackRange ?? 1.2;
+    let best = null;
+    let bestDist = Infinity;
+    for (const npc of next.npcs) {
+      if (npc.interaction !== "hostile" || npc.state === "defeated") continue;
+      const d = Math.hypot(next.player.x - npc.x, next.player.y - npc.y);
+      if (d < range && d < bestDist) { best = npc; bestDist = d; }
+    }
+    if (best) {
+      best.hp -= world.combat.playerAttackDamage ?? 20;
+      next.attackCooldown = world.combat.attackCooldownTicks ?? 30;
+      next.lastHit = { npcId: best.id, tick: next.tick };
+    }
+  }
+
   // NPC FSM + steering.
   for (const npc of next.npcs) {
+    if (npc.hp <= 0) {
+      if (npc.state !== "defeated") { npc.state = "defeated"; npc.defeatedTimer = 0; }
+      npc.defeatedTimer += 1;
+      if (npc.defeatedTimer >= (world.combat.npcRespawnTicks ?? 600)) {
+        npc.hp = npc.maxHp;
+        npc.state = "patrol";
+        npc.x = npc.homeX;
+        npc.y = npc.homeY;
+        npc.defeatedTimer = 0;
+      }
+      continue;
+    }
     const dist = Math.hypot(next.player.x - npc.x, next.player.y - npc.y);
     if (npc.hp <= fleeHp) {
       npc.state = "flee";
@@ -216,6 +257,10 @@ export function step(state, input, rng, world = DEFAULT_WORLD) {
         const dist = Math.hypot(next.player.x - place.x, next.player.y - place.y);
         if (dist < (params.range ?? 1.5)) quest.done = true;
       }
+    } else if (quest.type === "quest.defeat") {
+      const params = questNodeParams(world.quests.find((q) => q.id === quest.id) || {}, "defeat");
+      const npc = next.npcs.find((n) => n.id === params.npcId);
+      if (npc && npc.hp <= 0) quest.done = true;
     }
   }
   return next;

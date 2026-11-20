@@ -123,11 +123,14 @@ export function worldToSim(world) {
   const npcs = world.npcs.map((n) => {
     const ent = entities.get(n.entityId);
     const pos = ent ? toSim(ent.transform.position) : { x: 0, y: 0 };
+    const home = n.homePlaceId && places.get(n.homePlaceId) ? toSim(places.get(n.homePlaceId).position) : pos;
     return {
       id: n.id,
       name: n.name || n.id,
       x: pos.x,
       y: pos.y,
+      homeX: home.x,
+      homeY: home.y,
       hp: n.profile?.attributes?.hp ?? 100,
       homePlaceId: n.homePlaceId || null,
       interaction: n.behavior?.interaction || "talk",

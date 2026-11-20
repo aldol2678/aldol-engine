@@ -21,8 +21,8 @@ const manifest = JSON.parse(readFileSync(join(root, "games", "supuli", "world.js
 const validation = validateWorldManifest(manifest);
 check("world manifest valid", validation.valid, validation.errors.map((e) => `${e.code}@${e.path}`).join(", "));
 const world = worldToSim(manifest);
-check("world adapted", world.waypoints.length === 6 && world.houses.length === 5 && world.trees.length === 3
-  && world.shards.length === 3 && world.npcs.length === 2 && world.quests.length === 3 && world.bounds.maxX === 16,
+check("world adapted", world.waypoints.length === 9 && world.houses.length === 5 && world.trees.length === 7
+  && world.shards.length === 5 && world.npcs.length === 4 && world.quests.length === 6 && world.bounds.maxX === 24,
   `wp=${world.waypoints.length} houses=${world.houses.length} trees=${world.trees.length} shards=${world.shards.length} npcs=${world.npcs.length} quests=${world.quests.length} maxX=${world.bounds.maxX}`);
 // A deliberately broken manifest must fail validation.
 const broken = structuredClone(manifest);
@@ -102,8 +102,36 @@ check("quest collect-shards completes", collectState.quests.find((q) => q.id ===
 const gateState = steer("supuli-m1", world, () => world.places["forest-gate"], 900, 0);
 check("quest reach-forest-gate completes", gateState.quests.find((q) => q.id === "reach-forest-gate").done === true,
   `player=(${gateState.player.x.toFixed(1)}, ${gateState.player.y.toFixed(1)})`);
+const deepState = steer("supuli-m1", world, () => world.places["deep-forest-heart"], 1800, 0);
+check("quest reach-deep-forest completes", deepState.quests.find((q) => q.id === "reach-deep-forest").done === true,
+  `player=(${deepState.player.x.toFixed(1)}, ${deepState.player.y.toFixed(1)})`);
 
-// 3c. Combat-lite: stand next to the boar, HP must drop.
+// 3c. Defeat quest: attack the boar until its HP hits 0, then it respawns.
+let defeatState = createInitialState("supuli-m1", world);
+{
+  const rng = new Rng("supuli-m1").fork("ai:patrol");
+  const boar = () => defeatState.npcs.find((n) => n.id === "boar-1");
+  for (let f = 0; f < 1800; f++) {
+    const t = boar();
+    if (t.hp <= 0) break;
+    const dx = t.x - defeatState.player.x;
+    const dy = t.y - defeatState.player.y;
+    const len = Math.hypot(dx, dy);
+    const input = len > 0.9 ? { dx: dx / len, dy: dy / len } : { attack: true };
+    defeatState = step(defeatState, input, rng, world);
+  }
+}
+check("quest defeat-boar completes", defeatState.quests.find((q) => q.id === "defeat-boar").done === true,
+  `boar hp=${defeatState.npcs.find((n) => n.id === "boar-1").hp}`);
+{
+  const rng = new Rng("supuli-m1").fork("ai:patrol");
+  for (let f = 0; f < 700; f++) defeatState = step(defeatState, {}, rng, world);
+}
+check("defeated npc respawns at home", defeatState.npcs.find((n) => n.id === "boar-1").hp === 60
+  && defeatState.npcs.find((n) => n.id === "boar-1").state !== "defeated",
+  `boar hp=${defeatState.npcs.find((n) => n.id === "boar-1").hp} state=${defeatState.npcs.find((n) => n.id === "boar-1").state}`);
+
+// 3d. Combat-lite: stand next to the boar, HP must drop.
 let combatState = createInitialState("supuli-m1", world);
 {
   const rng = new Rng("supuli-m1").fork("ai:patrol");
@@ -119,7 +147,7 @@ let combatState = createInitialState("supuli-m1", world);
 }
 check("combat-lite contact damage", combatState.player.hp < 100, `hp=${combatState.player.hp}`);
 
-// 3d. Default world (no manifest) still works: talk quest completes.
+// 3e. Default world (no manifest) still works: talk quest completes.
 const defaultInputs = [];
 for (let f = 0; f < 300; f++) defaultInputs.push({ dx: 1, dy: 1 });
 for (let f = 0; f < 120; f++) defaultInputs.push({ dx: 0, dy: 0, interact: true });
