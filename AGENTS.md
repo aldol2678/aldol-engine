@@ -17,7 +17,13 @@
 
 ## 명령
 - `npm run check` — 매니페스트 검증 + 구문 검사 + 결정성 테스트 + 금지 API 검사. 커밋 전 필수.
+- `npm run check:all` — `check` + `check:fishing` 전부. 푸시 전 필수 (pre-push 훅이 이걸 돌린다).
 - `npm run simulate -- --seed <문자열> --frames <수> [--inputs <JSON>] [--world <경로>]` — 헤드리스 실행, 상태 해시 출력. 기본 월드는 `games/supuli/world.json`.
+
+## 푸시 게이트 (로컬)
+- GitHub Actions 포함 분(3,000분)이 소진돼서 클라우드 CI는 못 쓴다. 대신 로컬 pre-push 훅이 푸시 문지기다.
+- `tools/hooks/pre-push`가 `npm run check:all`을 돌리고, 실패하면 푸시를 막는다. 클론마다 한 번 `sh tools/install-hooks.sh`로 설치한다 (git 훅은 버전 관리가 안 되니까 체크인된 스크립트를 심링크로 건다).
+- 스냅샷 푸시(push-files)에는 git 훅이 안 걸리니까, 그때는 푸시 전에 `npm run check:all`을 직접 돌린다.
 
 ## 결정성 규칙 (절대)
 1. 시뮬레이션 경로는 순수 함수다. 렌더링·입력 장치·벽시계를 받지 않는다.

@@ -1,0 +1,9 @@
+#!/bin/sh
+# Aldol Engine pre-push hook: full check suite before any push.
+# GitHub Actions included minutes are exhausted, so this local hook is the push gate.
+# Install: sh tools/install-hooks.sh (run once per clone)
+set -e
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+echo "[aldol-engine] pre-push: npm run check:all"
+npm run check:all
