@@ -1,0 +1,21 @@
+name: check
+
+# Aldol Engine checks on the temporary burn-VM runner.
+# GitHub-hosted minutes are exhausted, so this runs on the self-hosted
+# runner `aldol-burn-vm2` (GCP n2-standard-16, dies with the VM 2026-11-26).
+# Until a runner with the `burn-vm2` label is online, runs queue and never start.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: [self-hosted, burn-vm2]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Show toolchain
+        run: node --version && npm --version
+      - name: Run all checks
+        run: npm run check:all
