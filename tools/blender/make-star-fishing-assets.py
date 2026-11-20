@@ -26,7 +26,7 @@ def make_material(name, color, metallic=0.6, roughness=0.35, emission=None, emis
 
 
 def add_sphere(name, loc, scale, mat):
-    bpy.ops.mesh.primitive_uv_sphere_add(segments=24, ring_count=16, location=loc)
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=16, ring_count=10, location=loc)
     o = bpy.context.active_object
     o.name = name
     o.scale = scale
@@ -36,7 +36,7 @@ def add_sphere(name, loc, scale, mat):
 
 
 def add_cone(name, loc, radius, depth, rot, mat):
-    bpy.ops.mesh.primitive_cone_add(vertices=12, radius1=radius, radius2=0.0, depth=depth, location=loc, rotation=rot)
+    bpy.ops.mesh.primitive_cone_add(vertices=8, radius1=radius, radius2=0.0, depth=depth, location=loc, rotation=rot)
     o = bpy.context.active_object
     o.name = name
     o.data.materials.append(mat)
