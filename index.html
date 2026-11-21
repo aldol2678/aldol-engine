@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aldol Engine — 세 개의 별 게임</title>
+<meta name="description" content="aldol.js 기반 웹 게임 엔진. Three.js / WebGL2 · 결정적 시뮬레이션 · MIT. 수풀리, 별낚시, 별수호 디펜스를 브라우저에서 바로 플레이.">
+<meta property="og:title" content="Aldol Engine — 세 개의 별 게임">
+<meta property="og:description" content="aldol.js 기반 웹 게임 엔진. 수풀리 · 별낚시 · 별수호 디펜스를 브라우저에서 바로 플레이.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://aldol-engine.pages.dev/">
+<meta name="twitter:card" content="summary">
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh;
+    background: #0a0e1e; color: #e8ecff;
+    font-family: "Noto Sans KR", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 56px 20px 40px; }
+  header { text-align: center; margin-bottom: 40px; }
+  h1 { margin: 0 0 10px; font-size: 40px; letter-spacing: -0.02em; }
+  h1 .star { color: #ffd76a; }
+  p.sub { margin: 0; color: #9aa7d8; font-size: 16px; line-height: 1.6; }
+  p.sub code { color: #cdd6ff; background: rgba(255,255,255,0.07); padding: 1px 6px; border-radius: 6px; font-size: 14px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } h1 { font-size: 30px; } }
+  .card {
+    display: block; text-decoration: none; color: inherit;
+    background: #121830; border: 1px solid #26305e; border-radius: 16px; overflow: hidden;
+    transition: transform .15s ease, border-color .15s ease;
+  }
+  .card:hover { transform: translateY(-3px); border-color: #4a5aa8; }
+  .card img { display: block; width: 100%; aspect-ratio: 1200 / 630; object-fit: cover; }
+  .card .body { padding: 16px 18px 18px; }
+  .card .tag { font-size: 12px; font-weight: 700; letter-spacing: .08em; color: #8affc1; }
+  .card h2 { margin: 6px 0 8px; font-size: 20px; }
+  .card p { margin: 0 0 14px; color: #aab4e0; font-size: 14px; line-height: 1.6; }
+  .card .play { display: inline-block; font-size: 14px; font-weight: 700; color: #0a0e1e; background: #ffd76a; border-radius: 999px; padding: 8px 16px; }
+  footer { margin-top: 44px; text-align: center; color: #7c88b8; font-size: 13px; line-height: 1.8; }
+  footer a { color: #aab4e0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1><span class="star">★</span> Aldol Engine</h1>
+    <p class="sub">aldol.js 기반 웹 게임 엔진 — Three.js / WebGL2 · 결정적 시뮬레이션 · WorldForge 매니페스트<br>
+    <code>npm run check:all</code> 로 검증하는 세 개의 별 게임을 브라우저에서 바로 플레이하세요.</p>
+  </header>
+  <div class="grid">
+    <a class="card" href="games/supuli/">
+      <img src="games/supuli/og-image.png" alt="수풀리 플레이 화면">
+      <div class="body">
+        <div class="tag">M1 · 마을 + 숲 + 농장</div>
+        <h2>수풀리</h2>
+        <p>마을 주민과 대화하고, 깊은 숲에서 별조각을 모아 농장을 일구는 첫 게임. 의뢰 9개.</p>
+        <span class="play">플레이하기 →</span>
+      </div>
+    </a>
+    <a class="card" href="games/star-fishing/">
+      <img src="games/star-fishing/og-image.png" alt="별낚시 플레이 화면">
+      <div class="body">
+        <div class="tag">M2 · 호수 낚시</div>
+        <h2>별낚시</h2>
+        <p>호수 선착장에서 별고기를 낚는 두 번째 게임. 찌 던지기 · 물기 타이밍 · 챔질. 의뢰 3개.</p>
+        <span class="play">플레이하기 →</span>
+      </div>
+    </a>
+    <a class="card" href="games/star-defense/">
+      <img src="games/star-defense/og-image.png" alt="별수호 디펜스 플레이 화면">
+      <div class="body">
+        <div class="tag">M3 · 타워 디펜스</div>
+        <h2>별수호 디펜스</h2>
+        <p>별빛탑과 달빛탑으로 그림자 적의 5웨이브를 막고 별 제단을 지키는 타워 디펜스. 의뢰 3개.</p>
+        <span class="play">플레이하기 →</span>
+      </div>
+    </a>
+  </div>
+  <footer>
+    MIT License · 소스 코드 <a href="https://github.com/aldol2678/aldol-engine">github.com/aldol2678/aldol-engine</a><br>
+    Aldol Studio — 게임은 저장됩니다. 진행 중인 웨이브(별수호 디펜스)는 저장되지 않습니다.
+  </footer>
+</div>
+</body>
+</html>
