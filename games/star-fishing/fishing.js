@@ -184,6 +184,9 @@ export function step(state, input, rng, world) {
   const dockEnd = world.places["dock-end"];
   const nearDockEnd = dockEnd && Math.hypot(next.player.x - dockEnd.x, next.player.y - dockEnd.y) < 1.5;
 
+  // Cooldown over: back to idle so the player can cast again.
+  if (fs.phase === "cooldown" && next.tick >= fs.cooldownUntil) fs.phase = "idle";
+
   if (input.cast && fs.phase === "idle" && next.tick >= fs.cooldownUntil && nearDockEnd) {
     // Cast: bobber lands 2 units past the dock end, in the lake.
     fs.phase = "waiting";
