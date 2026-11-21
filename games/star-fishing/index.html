@@ -24,9 +24,9 @@
 <script type="module">
 import * as THREE from "three";
 import { Rng } from "../../src/core/rng.js";
-import { stateHash } from "../../src/core/state-hash.js";
 import { validateWorldManifest, worldToSim } from "../../src/core/worldforge.js";
 import { createInitialState, step, SEED, TICK } from "./fishing.js";
+import { createSim } from "../../src/render/sim-loader.js";
 import { createAssetLoader } from "../../src/render/asset-loader.js";
 import { createAudioManager } from "../../src/render/audio.js";
 import {
@@ -53,8 +53,15 @@ audio.setMuted(localStorage.getItem("aldol-engine.audio.muted") === "1");
 window.addEventListener("pointerdown", () => audio.startBgm(), { once: true });
 window.addEventListener("keydown", () => audio.startBgm(), { once: true });
 
-const rng = new Rng(SEED);
-let state = createInitialState(SEED, world);
+// --- sim: WASM with JS fallback (src/render/sim-loader.js) ---
+const sim = await createSim({
+  kind: "fishing",
+  seed: SEED,
+  rngSeed: SEED,
+  world,
+  js: { createInitialState, step },
+});
+let state = sim.state;
 
 // --- HUD (shared kit: src/render/hud.js) ---
 installHudCss("lake");
@@ -114,6 +121,9 @@ function loadGame() {
   setSaveText(panel.slots["save-state"], "불러옴");
 }
 loadGame();
+// Push a restored save into the sim (no-op round-trip when there is no save).
+sim.loadState(state);
+state = sim.state;
 
 // --- Three.js scene (polish pass: shadows, sky, animated water, built-up models). ---
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -510,7 +520,7 @@ function frame(now) {
   let stepped = false;
   while (acc >= TICK) {
     acc -= TICK;
-    state = step(state, readInput(), rng, world);
+    state = sim.step(readInput());
     stepped = true;
   }
   if (stepped) {
@@ -622,7 +632,8 @@ function frame(now) {
 
 window.__STAR_FISHING__ = {
   get state() { return state; },
-  get hash() { return stateHash(state); },
+  get hash() { return sim.hash(); },
+  get backend() { return sim.backend; },
   world, saveKey: SAVE_KEY, assets: assetStatus,
   audio: { get muted() { return audio.muted; }, get played() { return audio.played; } },
 };

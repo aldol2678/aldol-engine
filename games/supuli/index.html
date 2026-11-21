@@ -28,9 +28,8 @@ import {
   installHudCss, createHudPanel, createBark, createPrompt, createHelp,
   createRoundButton, bindMute, renderQuests, setSaveText, setPosText,
 } from "../../src/render/hud.js";
-import { Rng } from "../../src/core/rng.js";
+import { createSim } from "../../src/render/sim-loader.js";
 import { createInitialState, step, simulate, STEP } from "../../src/core/sim.js";
-import { stateHash } from "../../src/core/state-hash.js";
 import { validateWorldManifest, worldToSim } from "../../src/core/worldforge.js";
 
 const SEED = "supuli-m1";
@@ -74,8 +73,19 @@ const BARKS = {
 };
 const STATE_LABEL = { patrol: "순찰", chase: "추격", flee: "도망", defeated: "처치됨" };
 
+// --- sim: WASM with JS fallback (src/render/sim-loader.js) ---
+// The live rng is fork("bark"): the same stream feeds the sim steps AND the
+// bark picks, so bark lines come from sim.pick() (see the frame loop) and
+// the stream stays identical to the JS path.
+const sim = await createSim({
+  kind: "supuli",
+  seed: SEED,
+  rngSeed: SEED + "::bark",
+  world,
+  js: { createInitialState, step },
+});
+let state = sim.state;
 // --- state (save is a snapshot, not a seed: it restores position + progress) ---
-let state = createInitialState(SEED, world);
 const saved = (() => { try { return JSON.parse(localStorage.getItem(SAVE_KEY)); } catch { return null; } })();
 if (saved && saved.player) {
   state.player.x = saved.player.x;
@@ -107,7 +117,9 @@ if (saved && saved.player) {
   }
   setSaveText(panel.slots["save-state"], "불러옴", "저장됨");
 }
-const barkRng = new Rng(SEED).fork("bark");
+// Push a restored save into the sim (no-op round-trip when there is no save).
+sim.loadState(state);
+state = sim.state;
 
 // --- three.js scene (built from the manifest) ---
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -376,22 +388,22 @@ function frame(now) {
     const before = new Map(state.npcs.map((n) => [n.id, n.state]));
     const wasDone = new Map(state.quests.map((q) => [q.id, q.done]));
     const hpBefore = state.player.hp;
-    state = step(state, input, barkRng, world);
+    state = sim.step(input);
     stepped = true;
     acc -= STEP;
     for (const n of state.npcs) {
       if (n.state !== before.get(n.id)) {
         const pool = n.id === "guardian-1" ? BARKS.guardian : n.interaction === "hostile" ? BARKS.boar : BARKS[n.state];
-        bark.show(barkRng.pick(pool));
+        bark.show(sim.pick(pool));
       }
     }
     if (state.lastHit && (!prevHitTick || state.lastHit.tick !== prevHitTick)) {
       prevHitTick = state.lastHit.tick;
       audio.play("hit");
-      bark.show(barkRng.pick(BARKS.hit));
+      bark.show(sim.pick(BARKS.hit));
     }
     for (const q of state.quests) {
-      if (q.done && !wasDone.get(q.id)) { audio.play("quest"); bark.show(barkRng.pick(BARKS.quest)); saveGame("의뢰 완료, 저장됨"); }
+      if (q.done && !wasDone.get(q.id)) { audio.play("quest"); bark.show(sim.pick(BARKS.quest)); saveGame("의뢰 완료, 저장됨"); }
     }
     const herbsNow = state.herbs.filter((h) => h.consumed).length;
     if (herbsNow > prevHerbsConsumed) {
@@ -442,7 +454,8 @@ requestAnimationFrame(frame);
 // QA hook: window.__SUPULI_M1__ = { state, hash, world, simulate, saveKey }
 window.__SUPULI_M1__ = {
   get state() { return state; },
-  get hash() { return stateHash(state); },
+  get hash() { return sim.hash(); },
+  get backend() { return sim.backend; },
   world, simulate, saveKey: SAVE_KEY,
   audio: { get muted() { return audio.muted; }, get played() { return audio.played; } },
 };
