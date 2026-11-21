@@ -79,9 +79,17 @@ const THEMES = {
 };
 
 const CSS = `
-html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: var(--hud-page-bg, #101a12); font-family: system-ui, sans-serif; }
+/* 모바일 기본값 (2026-11-21): 게임은 웹페이지가 아니라 앱처럼 굴러야 한다.
+   - 텍스트 선택·드래그·롱프레스 메뉴 차단: 모바일에서 HUD 글씨를 길게 누르면
+     선택 영역이 생기던 문제. user-select와 -webkit-touch-callout을 끈다.
+   - 캔버스는 touch-action: none: 드래그가 브라우저 스크롤로 새지 않고
+     게임의 pointerdown/pointermove(이동·배치)로 그대로 간다.
+   - body는 manipulation(더블탭 줌만 끔) + overscroll-behavior: none(당겨서 새로고침 방지).
+   버튼(.hud-btn)에는 이미 user-select/touch-action이 들어가 있다. */
+html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: var(--hud-page-bg, #101a12); font-family: system-ui, sans-serif; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation; overscroll-behavior: none; }
 #app { position: fixed; inset: 0; }
-#app canvas { display: block; }
+#app canvas { display: block; touch-action: none; }
+.hud-panel, #bark, #prompt, #help { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .hud-panel { position: absolute; left: 12px; top: 12px; max-width: 320px; background: var(--hud-panel-bg, rgba(16, 26, 18, 0.82)); color: var(--hud-panel-fg, #e8f3e8); border-radius: 10px; padding: var(--hud-panel-padding, 10px 12px); line-height: 1.5; pointer-events: none; }
 .hud-panel.top-right { left: auto; right: 12px; }
 .hud-panel h1 { font-size: var(--hud-title-size, 15px); margin: 0 0 4px; }

@@ -65,6 +65,7 @@
 - 세 게임의 HUD(정보 패널·말풍선·프롬프트·도움말·둥근 버튼·음소거 버튼·의뢰 목록)는 `src/render/hud.js` 하나로 공유한다. 새 게임도 이 킷으로 HUD를 만든다 — CSS/HTML/배선을 게임마다 복사하지 않는다.
 - `installHudCss("forest" | "lake" | "night")`로 테마(색·크기·위치)만 고르고, `createHudPanel`·`createBark`·`createPrompt`·`createHelp`·`createRoundButton`·`bindMute`·`renderQuests`·`setSaveText`·`setPosText`로 조립한다. 요소 id는 킷 이전과 동일하게 유지한다(`#bark`·`#prompt`·`#help`·`#mute-btn`·`#zone`·`#quests`·`#save-state` …) — 프로브와 저장 코드가 그대로 동작한다. 좁은 화면(≤640px)에서는 상단 두 패널이 겹치지 않게 킷 CSS 미디어 쿼리로 패널 최대 너비를 줄인다.
 - HUD는 렌더 전용이다. 심 상태를 건드리지 않고, 결정성 해시에 영향을 주지 않는다. 말풍선 자동 숨김은 프레임 루프의 `bark.tick(dt)`로 처리한다(벽시계 `setTimeout` 금지).
+- **모바일 기본값은 킷 CSS에 있다 (2026-11-21): 텍스트 선택·드래그·롱프레스 메뉴 차단(`user-select: none`, `-webkit-touch-callout: none`), 캔버스 `touch-action: none`(드래그가 게임으로 감), body `touch-action: manipulation` + `overscroll-behavior: none`.** 새 게임·새 페이지를 만들 때도 이 기본값을 빼먹지 않는다 — 모바일에서 글씨가 드래그되면 게임이 아니라 웹페이지처럼 보인다.
 - 렌더 공유 모듈은 `src/render/`에 둔다 (`audio.js`, `asset-loader.js`, `hud.js`). 심 공유 코어(`src/core/`)와 다르다 — 심 규칙을 렌더 모듈에 넣지 않는다.
 
 ## AI 최소 집합 (M1)
