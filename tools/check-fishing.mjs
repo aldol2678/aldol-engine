@@ -61,7 +61,7 @@ for (const f of ["games/star-fishing/fishing.js", "src/core/worldforge.js"]) {
 // which only exists in the browser importmap. vm.SourceTextModule parses
 // without resolving imports (needs --experimental-vm-modules, see package.json).
 import vm from "node:vm";
-for (const f of ["src/render/asset-loader.js", "src/render/hud.js", "src/render/vendor/GLTFLoader.js", "src/render/vendor/BufferGeometryUtils.js"]) {
+for (const f of ["src/render/asset-loader.js", "src/render/hud.js", "src/render/vendor/GLTFLoader.js", "src/render/vendor/BufferGeometryUtils.js", "src/render/vendor/SkeletonUtils.js"]) {
   try {
     new vm.SourceTextModule(fs.readFileSync(new URL(`../${f}`, import.meta.url), "utf8"));
     check(`syntax ${f}`, true);

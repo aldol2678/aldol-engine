@@ -4,7 +4,7 @@
 
 ## 목적
 - aldol.js 기반 웹 게임 엔진. M1 첫 게임은 **수풀리** (마을 1맵 슬라이스 → 2026-11-20 확장: 마을 + 숲입구 + 숲 깊은 곳 + 농장, 의뢰 9개, 전투 공격/처치, 작물·약초). M2 두 번째 게임은 **별낚시** (호수 낚시: 찌 던지기·물기 타이밍·챔질, 물고기 FSM, 의뢰 3개) — 같은 공유 코어(`src/core/`) 위의 새 게임으로 재사용을 증명한다.
-- Three.js 0.160.0, WebGL2 기본. 라이선스는 UNLICENSED (M3 전 MIT).
+- Three.js 0.187.0, WebGL2 기본. 라이선스는 UNLICENSED (M3 전 MIT).
 - 배포는 Cloudflare Pages만. `latest` 태그는 쓰지 않는다.
 
 ## 디렉터리
@@ -50,7 +50,7 @@
 
 ## 에셋 (GLB 파이프라인)
 - 매니페스트 에셋 URI는 `builtin:<이름>` 또는 `glb:<게임 폴더 안 상대 경로>.glb`만 된다. 상위 폴더(`..`)·절대 경로·외부 URL은 검증이 거부한다.
-- GLB는 Blender 스크립트(`tools/blender/make-star-fishing-assets.py`, `npm run assets:fishing`)로 만들고 `games/<game>/assets/models/`에 둔다. 로더는 `src/render/asset-loader.js` (three 0.160.0 GLTFLoader 벤더링, `src/render/vendor/` — CDN 의존 없음).
+- GLB는 Blender 스크립트(`tools/blender/make-star-fishing-assets.py`, `npm run assets:fishing`)로 만들고 `games/<game>/assets/models/`에 둔다. 로더는 `src/render/asset-loader.js` (three 0.187.0 GLTFLoader 벤더링, `src/render/vendor/` — CDN 의존 없음; r187부터 GLTFLoader가 `SkeletonUtils.js`도 import하므로 함께 벤더링한다).
 - GLB 로딩은 렌더러에서만 일어난다. 심은 건드리지 않는다(결정성 유지). 로드 실패 시 원시(primitive) 폴백을 쓰고 게임은 그대로 시작한다.
 - 새 게임이 GLB를 쓰면 `tools/check-<game>.mjs`에 매직바이트 검증 + 프로브 훅(`assets.loaded/failed`) 확인을 넣는다.
 
