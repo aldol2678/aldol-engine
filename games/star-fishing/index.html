@@ -4,66 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>별낚시 M2 — 호수 낚시 | Aldol Engine</title>
-<style>
-  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #0b1620; font-family: "Noto Sans KR", system-ui, sans-serif; }
-  #app { position: fixed; inset: 0; }
-  canvas { display: block; }
-  #hud {
-    position: absolute; top: 12px; left: 12px; max-width: 320px;
-    background: rgba(10, 20, 30, 0.72); color: #eaf6ff; border-radius: 10px;
-    padding: 12px 14px; font-size: 14px; line-height: 1.5; pointer-events: none;
-  }
-  #hud h1 { margin: 0 0 4px; font-size: 17px; }
-  #hud .done { color: #7dff9b; }
-  #hud .todo { color: #cfe8ff; }
-  #phase {
-    position: absolute; top: 12px; right: 12px; max-width: 280px;
-    background: rgba(10, 20, 30, 0.72); color: #ffe9a8; border-radius: 10px;
-    padding: 10px 14px; font-size: 15px; pointer-events: none;
-  }
-  #prompt {
-    position: absolute; bottom: 96px; left: 50%; transform: translateX(-50%);
-    background: rgba(10, 20, 30, 0.8); color: #fff; border-radius: 8px;
-    padding: 8px 14px; font-size: 15px; display: none;
-  }
-  #bark {
-    position: absolute; bottom: 150px; left: 50%; transform: translateX(-50%);
-    background: #fff; color: #222; border-radius: 12px; padding: 8px 14px;
-    font-size: 15px; display: none; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-  }
-  #help {
-    position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
-    background: rgba(10, 20, 30, 0.6); color: #cfe8ff; border-radius: 8px;
-    padding: 6px 12px; font-size: 13px; max-width: calc(100vw - 24px); text-align: center;
-  }
-  .btn {
-    position: absolute; bottom: 64px; width: 72px; height: 72px; border-radius: 50%;
-    border: none; font-size: 15px; font-weight: bold; color: #fff;
-    background: rgba(30, 90, 140, 0.85); box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-  }
-  #cast-btn { right: 96px; }
-  #reel-btn { right: 12px; background: rgba(180, 60, 40, 0.9); }
-  #mute-btn { right: 180px; }
-</style>
 </head>
 <body>
 <div id="app"></div>
-<div id="hud">
-  <h1>별낚시 M2 — 호수 낚시</h1>
-  <div id="zone">구역: 호숫가</div>
-  <div id="score">점수: 0 · 낚은 고기: 0마리</div>
-  <div id="quests"></div>
-  <div id="npcs"></div>
-  <div id="pos"></div>
-  <div id="save-state">저장: 자동 저장됨</div>
-</div>
-<div id="phase">선착장 끝으로 가서 E를 눌러 찌를 던지세요.</div>
-<div id="prompt">E — 낚시꾼과 대화하기</div>
-<div id="bark"></div>
-<div id="help">WASD/방향키 이동 · E 던지기/대화 · 스페이스바 챔질 · 드래그 이동(터치)</div>
-<button class="btn" id="cast-btn">🎣 던지기</button>
-<button class="btn" id="reel-btn">🌀 챔질</button>
-<button class="btn" id="mute-btn">🔊</button>
 <script type="importmap">
 { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
 </script>
@@ -75,6 +18,10 @@ import { validateWorldManifest, worldToSim } from "../../src/core/worldforge.js"
 import { createInitialState, step, SEED, TICK } from "./fishing.js";
 import { createAssetLoader } from "../../src/render/asset-loader.js";
 import { createAudioManager } from "../../src/render/audio.js";
+import {
+  installHudCss, createHudPanel, createBark, createPrompt, createHelp,
+  createRoundButton, bindMute, renderQuests, setSaveText, setPosText,
+} from "../../src/render/hud.js";
 
 const SAVE_KEY = "aldol-engine.star-fishing-m2.save.v1";
 
@@ -98,6 +45,29 @@ window.addEventListener("keydown", () => audio.startBgm(), { once: true });
 const rng = new Rng(SEED);
 let state = createInitialState(SEED, world);
 
+// --- HUD (shared kit: src/render/hud.js) ---
+installHudCss("lake");
+const panel = createHudPanel({
+  id: "hud",
+  title: "별낚시 M2 — 호수 낚시",
+  rows: [
+    { id: "zone", tag: "div" },
+    { id: "score", tag: "div" },
+    { id: "quests", tag: "div" },
+    { id: "npcs", tag: "div" },
+    { id: "pos", tag: "div" },
+    { id: "save-state", tag: "div" },
+  ],
+});
+const phasePanel = createHudPanel({
+  id: "phase",
+  position: "right",
+  style: { color: "#ffe9a8", padding: "10px 14px", fontSize: "15px" },
+});
+const bark = createBark();
+const prompt = createPrompt("E — 낚시꾼과 대화하기");
+createHelp("WASD/방향키 이동 · E 던지기/대화 · 스페이스바 챔질 · 드래그 이동(터치)", "center");
+
 // --- Save / load. ---
 function saveGame(note) {
   localStorage.setItem(SAVE_KEY, JSON.stringify({
@@ -108,7 +78,7 @@ function saveGame(note) {
     quests: state.quests.map((q) => ({ id: q.id, done: q.done, progress: q.progress })),
     tick: state.tick, savedAt: Date.now(),
   }));
-  document.getElementById("save-state").textContent = "저장: " + (note || "자동 저장됨");
+  setSaveText(panel.slots["save-state"], note);
 }
 function loadGame() {
   let saved;
@@ -130,7 +100,7 @@ function loadGame() {
       if (q) { q.done = !!sq.done; q.progress = sq.progress ?? 0; }
     }
   }
-  document.getElementById("save-state").textContent = "저장: 불러옴";
+  setSaveText(panel.slots["save-state"], "불러옴");
 }
 loadGame();
 
@@ -440,19 +410,13 @@ let drag = null;
 window.addEventListener("keydown", (e) => {
   if (e.key === " ") { reelPressed = true; e.preventDefault(); }
   if (e.key === "e" || e.key === "E") castPressed = true;
-  if (e.key.toLowerCase() === "m") toggleMute();
   keys.add(e.key.toLowerCase());
 });
-function toggleMute() {
-  audio.setMuted(!audio.muted);
-  localStorage.setItem("aldol-engine.audio.muted", audio.muted ? "1" : "0");
-  document.getElementById("mute-btn").textContent = audio.muted ? "🔇" : "🔊";
-}
-document.getElementById("mute-btn").textContent = audio.muted ? "🔇" : "🔊";
-document.getElementById("mute-btn").addEventListener("pointerdown", () => toggleMute());
 window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
-document.getElementById("cast-btn").addEventListener("pointerdown", () => { castPressed = true; });
-document.getElementById("reel-btn").addEventListener("pointerdown", () => { reelPressed = true; });
+createRoundButton({ id: "cast-btn", label: "🎣 던지기", size: 72, right: 96, bottom: 64, background: "rgba(30, 90, 140, 0.85)", onPress: () => { castPressed = true; } });
+createRoundButton({ id: "reel-btn", label: "🌀 챔질", size: 72, right: 12, bottom: 64, background: "rgba(180, 60, 40, 0.9)", onPress: () => { reelPressed = true; } });
+const muteBtn = createRoundButton({ id: "mute-btn", label: "🔊", size: 72, right: 180, bottom: 64, background: "rgba(30, 90, 140, 0.85)" });
+bindMute(audio, muteBtn);
 renderer.domElement.addEventListener("pointerdown", (e) => { drag = { x: e.clientX, y: e.clientY, dx: 0, dy: 0 }; });
 renderer.domElement.addEventListener("pointermove", (e) => {
   if (!drag) return;
@@ -485,21 +449,13 @@ function readInput() {
 }
 
 // --- HUD. ---
-const zoneEl = document.getElementById("zone");
-const scoreEl = document.getElementById("score");
-const questsEl = document.getElementById("quests");
-const npcsEl = document.getElementById("npcs");
-const posEl = document.getElementById("pos");
-const phaseEl = document.getElementById("phase");
-const promptEl = document.getElementById("prompt");
-const barkEl = document.getElementById("bark");
-let barkTimer = 0;
+const zoneEl = panel.slots["zone"];
+const scoreEl = panel.slots["score"];
+const questsEl = panel.slots["quests"];
+const npcsEl = panel.slots["npcs"];
+const posEl = panel.slots["pos"];
+const phaseEl = phasePanel.el;
 const barkRng = new Rng(SEED + ":bark");
-function showBark(text) {
-  barkEl.textContent = text;
-  barkEl.style.display = "block";
-  barkTimer = 2.5;
-}
 const BARKS = {
   catch: ["별고기를 낚았어!", "잡았다! 반짝이는 별고기야!", "낚시 대성공!"],
   scare: ["너무 빨랐어, 물고기가 도망갔어!", "아쉽다, 조금만 더 기다릴 걸!"],
@@ -509,11 +465,9 @@ const BARKS = {
 function refreshHud() {
   zoneEl.textContent = `구역: ${state.player.y < 0 ? (Math.abs(state.player.x) <= 1 ? "선착장" : "호수") : "호숫가"}`;
   scoreEl.textContent = `점수: ${state.score} · 낚은 고기: ${state.caught.length}마리 · 던진 횟수: ${state.casts}`;
-  questsEl.innerHTML = state.quests.map((q) =>
-    `<div class="${q.done ? "done" : "todo"}">${q.done ? "✓" : "·"} ${q.name}${q.type === "quest.catch" ? ` (${q.progress}/3)` : ""}</div>`
-  ).join("");
+  renderQuests(questsEl, state.quests, (q) => q.type === "quest.catch" ? ` (${q.progress}/3)` : "");
   npcsEl.textContent = "물고기: " + state.fish.map((f) => `${f.id}:${f.state === "caught" ? "낚임" : f.state === "chase" ? "미끼로" : f.state === "flee" ? "도망" : "헤엄"}`).join(" · ");
-  posEl.textContent = `위치: (${state.player.x.toFixed(1)}, ${state.player.y.toFixed(1)})`;
+  setPosText(posEl, state.player.x, state.player.y);
   const fs = state.fishing;
   phaseEl.textContent =
     fs.phase === "waiting" ? "기다리는 중… 물고기가 올 때까지 기다리세요." :
@@ -523,7 +477,7 @@ function refreshHud() {
   const angler = state.npcs.find((n) => n.id === "angler-1");
   const talkQuest = state.quests.find((q) => q.type === "quest.talk");
   const near = angler && Math.hypot(state.player.x - angler.x, state.player.y - angler.y) < 1.5;
-  promptEl.style.display = (talkQuest && !talkQuest.done && near) ? "block" : "none";
+  prompt.setVisible(talkQuest && !talkQuest.done && near);
 }
 
 // --- Main loop (fixed step 1/60). ---
@@ -551,25 +505,25 @@ function frame(now) {
       if (q.done && !wasDone.get(q.id)) {
         wasDone.set(q.id, true);
         audio.play("quest");
-        showBark(barkRng.pick(BARKS.quest));
+        bark.show(barkRng.pick(BARKS.quest));
         saveGame("의뢰 완료, 저장됨");
       }
     }
     if (state.caught.length > prevCaught) {
       prevCaught = state.caught.length;
       audio.play("catch");
-      showBark(barkRng.pick(BARKS.catch));
+      bark.show(barkRng.pick(BARKS.catch));
       if (lastBobber) burstSparkles(lastBobber.x, 0.6, lastBobber.y);
       saveGame("고기 낚음, 저장됨");
     }
     if (prevPhase === "idle" && state.fishing.phase === "waiting") audio.play("cast");
     if (prevPhase !== "bite" && state.fishing.phase === "bite") audio.play("bite");
-    if (prevPhase === "waiting" && state.fishing.phase === "cooldown") showBark(barkRng.pick(BARKS.scare));
+    if (prevPhase === "waiting" && state.fishing.phase === "cooldown") bark.show(barkRng.pick(BARKS.scare));
     prevPhase = state.fishing.phase;
     if (now - lastSave > 5000) { saveGame(); lastSave = now; }
     refreshHud();
   }
-  if (barkTimer > 0) { barkTimer -= dt; if (barkTimer <= 0) barkEl.style.display = "none"; }
+  bark.tick(dt);
 
   const t = now / 1000;
 

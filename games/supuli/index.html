@@ -4,48 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>수풀리 M1 — 마을 + 숲 + 농장 | Aldol Engine</title>
-<style>
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #101a12; font-family: system-ui, sans-serif; }
-  #app { position: fixed; inset: 0; }
-  canvas { display: block; }
-  .panel { position: absolute; left: 12px; top: 12px; background: rgba(16, 26, 18, 0.82); color: #e8f3e8; padding: 10px 12px; border-radius: 10px; max-width: 320px; line-height: 1.5; }
-  .panel h1 { font-size: 15px; margin: 0 0 4px; }
-  .panel p { font-size: 13px; margin: 2px 0; }
-  .panel .done { color: #9be49b; }
-  .hpbar { height: 8px; background: #333; border-radius: 4px; overflow: hidden; margin: 4px 0; }
-  .hpbar > div { height: 100%; background: #e05252; width: 100%; }
-  #bark { position: absolute; left: 50%; bottom: 92px; transform: translateX(-50%); background: #fffbe8; color: #222; border-radius: 12px; padding: 8px 14px; font-size: 14px; display: none; max-width: 80vw; box-shadow: 0 2px 10px rgba(0,0,0,.35); }
-  #prompt { position: absolute; left: 50%; bottom: 48px; transform: translateX(-50%); background: rgba(0,0,0,.65); color: #fff; border-radius: 8px; padding: 6px 12px; font-size: 14px; display: none; }
-  #help { position: absolute; right: 12px; bottom: 12px; color: #cfe3cf; background: rgba(16,26,18,.7); padding: 6px 10px; border-radius: 8px; font-size: 12px; }
-</style>
 <script type="importmap">
 { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
 </script>
 </head>
 <body>
 <div id="app"></div>
-<div class="panel">
-  <h1>수풀리 M1 — 마을 + 숲 + 농장</h1>
-  <p id="zone">구역: 마을</p>
-  <div class="hpbar"><div id="hpfill"></div></div>
-  <p id="hp">체력: 100</p>
-  <div id="quests"></div>
-  <p id="npc-state">주민: 순찰</p>
-  <p id="pos">위치: (0.0, 0.0)</p>
-  <p id="save-state">저장: —</p>
-</div>
-<div id="bark"></div>
-<div id="prompt">E: 대화하기</div>
-<div id="attack-btn">⚔ 공격</div>
-<div id="mute-btn">🔊</div>
-<div id="help">WASD/방향키 이동 · E 대화 · 스페이스바 공격 · 드래그 이동(터치)</div>
-<style>
-  #attack-btn { position: absolute; right: 16px; bottom: 56px; width: 72px; height: 72px; border-radius: 50%; background: rgba(180, 60, 60, 0.85); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: bold; user-select: none; touch-action: none; }
-  #mute-btn { position: absolute; right: 16px; bottom: 140px; width: 44px; height: 44px; border-radius: 50%; background: rgba(16, 26, 18, 0.85); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 20px; user-select: none; touch-action: none; cursor: pointer; }
-</style>
 <script type="module">
 import * as THREE from "three";
 import { createAudioManager } from "../../src/render/audio.js";
+import {
+  installHudCss, createHudPanel, createBark, createPrompt, createHelp,
+  createRoundButton, bindMute, renderQuests, setSaveText, setPosText,
+} from "../../src/render/hud.js";
 import { Rng } from "../../src/core/rng.js";
 import { createInitialState, step, simulate, STEP } from "../../src/core/sim.js";
 import { stateHash } from "../../src/core/state-hash.js";
@@ -62,6 +33,24 @@ if (!validation.valid) {
   throw new Error("world manifest invalid");
 }
 const world = worldToSim(manifest);
+
+// --- HUD (shared kit: src/render/hud.js) ---
+installHudCss("forest");
+const panel = createHudPanel({
+  title: "수풀리 M1 — 마을 + 숲 + 농장",
+  rows: [
+    "zone",
+    { tag: "div", className: "hpbar", html: '<div id="hpfill"></div>' },
+    "hp",
+    { id: "quests", tag: "div" },
+    "npc-state",
+    "pos",
+    "save-state",
+  ],
+});
+const bark = createBark();
+const prompt = createPrompt("E: 대화하기");
+createHelp("WASD/방향키 이동 · E 대화 · 스페이스바 공격 · 드래그 이동(터치)", "right");
 
 const BARKS = {
   patrol: ["오늘 날씨 참 좋지.", "마을은 평화로워야 해.", "길을 잃었나? 마을은 작아."],
@@ -105,7 +94,7 @@ if (saved && saved.player) {
       if (h) h.consumed = !!sh.consumed;
     }
   }
-  document.getElementById("save-state").textContent = "저장: 불러옴";
+  setSaveText(panel.slots["save-state"], "불러옴", "저장됨");
 }
 const barkRng = new Rng(SEED).fork("bark");
 
@@ -279,7 +268,6 @@ let touchVec = { x: 0, y: 0 };
 addEventListener("keydown", (e) => {
   keys[e.key.toLowerCase()] = true;
   if (e.key.toLowerCase() === "e") interactPressed = true;
-  if (e.key.toLowerCase() === "m") toggleMute();
   if (e.code === "Space") { attackPressed = true; e.preventDefault(); }
 });
 
@@ -288,13 +276,6 @@ const audio = createAudioManager();
 audio.setMuted(localStorage.getItem("aldol-engine.audio.muted") === "1");
 window.addEventListener("pointerdown", () => audio.startBgm(), { once: true });
 window.addEventListener("keydown", () => audio.startBgm(), { once: true });
-function toggleMute() {
-  audio.setMuted(!audio.muted);
-  localStorage.setItem("aldol-engine.audio.muted", audio.muted ? "1" : "0");
-  document.getElementById("mute-btn").textContent = audio.muted ? "🔇" : "🔊";
-}
-document.getElementById("mute-btn").textContent = audio.muted ? "🔇" : "🔊";
-document.getElementById("mute-btn").addEventListener("pointerdown", () => toggleMute());
 addEventListener("keyup", (e) => { keys[e.key.toLowerCase()] = false; });
 let dragStart = null;
 renderer.domElement.addEventListener("pointerdown", (e) => { dragStart = { x: e.clientX, y: e.clientY }; });
@@ -303,7 +284,9 @@ renderer.domElement.addEventListener("pointermove", (e) => {
   touchVec = { x: (e.clientX - dragStart.x) / 40, y: (e.clientY - dragStart.y) / 40 };
 });
 addEventListener("pointerup", () => { dragStart = null; touchVec = { x: 0, y: 0 }; });
-document.getElementById("attack-btn").addEventListener("pointerdown", (e) => { attackPressed = true; e.preventDefault(); });
+createRoundButton({ id: "attack-btn", label: "⚔ 공격", size: 72, right: 16, bottom: 56, background: "rgba(180, 60, 60, 0.85)", onPress: () => { attackPressed = true; } });
+const muteBtn = createRoundButton({ id: "mute-btn", label: "🔊", size: 44, fontSize: 20, right: 16, bottom: 140, background: "rgba(16, 26, 18, 0.85)" });
+bindMute(audio, muteBtn);
 
 function readInput() {
   // Screen mapping: camera sits at +z looking -z, so W (up-screen) = +y, S = -y.
@@ -332,35 +315,26 @@ function saveGame(note) {
       herbs: state.herbs.map((h) => ({ id: h.id, consumed: h.consumed })),
       tick: state.tick, savedAt: Date.now(),
     }));
-    document.getElementById("save-state").textContent = `저장: ${note || "저장됨"}`;
+    setSaveText(panel.slots["save-state"], note || "저장됨", "저장됨");
   } catch { /* storage unavailable: game still runs */ }
 }
 setInterval(() => saveGame("자동 저장됨"), 5000);
 addEventListener("beforeunload", () => saveGame("저장됨"));
 
 // --- HUD + bark ---
-const questsEl = document.getElementById("quests");
-const npcEl = document.getElementById("npc-state");
-const posEl = document.getElementById("pos");
-const hpEl = document.getElementById("hp");
+const questsEl = panel.slots["quests"];
+const npcEl = panel.slots["npc-state"];
+const posEl = panel.slots["pos"];
+const hpEl = panel.slots["hp"];
 const hpFill = document.getElementById("hpfill");
-const zoneEl = document.getElementById("zone");
-const barkEl = document.getElementById("bark");
-const promptEl = document.getElementById("prompt");
-let barkTimer = 0;
+const zoneEl = panel.slots["zone"];
 let prevHitTick = null;
 let prevHerbsConsumed = state.herbs.filter((h) => h.consumed).length;
 const prevNpcState = new Map(state.npcs.map((n) => [n.id, n.state]));
-function showBark(text) {
-  barkEl.textContent = text;
-  barkEl.style.display = "block";
-  barkTimer = 2.5;
-}
 function refreshHud() {
-  questsEl.innerHTML = state.quests.map((q) =>
-    q.done ? `<p><span class="done">✔ ${q.name}</span></p>` : `<p>· ${q.name}${q.progress ? ` (${q.progress})` : ""}</p>`).join("");
+  renderQuests(questsEl, state.quests, (q) => q.progress ? ` (${q.progress})` : "");
   npcEl.textContent = state.npcs.map((n) => `${n.name}: ${STATE_LABEL[n.state] || n.state}`).join(" · ");
-  posEl.textContent = `위치: (${state.player.x.toFixed(1)}, ${state.player.y.toFixed(1)})`;
+  setPosText(posEl, state.player.x, state.player.y);
   hpEl.textContent = `체력: ${state.player.hp}`;
   hpFill.style.width = `${Math.max(0, state.player.hp)}%`;
   zoneEl.textContent = `구역: ${state.player.y <= -2 && state.player.x <= 6 ? "농장" : state.player.x >= 16 ? "숲 깊은 곳" : state.player.x >= 10 ? "숲 입구" : "마을"}`;
@@ -371,7 +345,7 @@ function refreshHud() {
     const npc = state.npcs.find((n) => n.id === npcId);
     if (npc && Math.hypot(state.player.x - npc.x, state.player.y - npc.y) < 1.5) { nearTalk = true; break; }
   }
-  promptEl.style.display = nearTalk ? "block" : "none";
+  prompt.setVisible(nearTalk);
 }
 
 // --- main loop: fixed-step accumulator, render from sim state ---
@@ -394,27 +368,27 @@ function frame(now) {
     for (const n of state.npcs) {
       if (n.state !== before.get(n.id)) {
         const pool = n.id === "guardian-1" ? BARKS.guardian : n.interaction === "hostile" ? BARKS.boar : BARKS[n.state];
-        showBark(barkRng.pick(pool));
+        bark.show(barkRng.pick(pool));
       }
     }
     if (state.lastHit && (!prevHitTick || state.lastHit.tick !== prevHitTick)) {
       prevHitTick = state.lastHit.tick;
       audio.play("hit");
-      showBark(barkRng.pick(BARKS.hit));
+      bark.show(barkRng.pick(BARKS.hit));
     }
     for (const q of state.quests) {
-      if (q.done && !wasDone.get(q.id)) { audio.play("quest"); showBark(barkRng.pick(BARKS.quest)); saveGame("의뢰 완료, 저장됨"); }
+      if (q.done && !wasDone.get(q.id)) { audio.play("quest"); bark.show(barkRng.pick(BARKS.quest)); saveGame("의뢰 완료, 저장됨"); }
     }
     const herbsNow = state.herbs.filter((h) => h.consumed).length;
     if (herbsNow > prevHerbsConsumed) {
       prevHerbsConsumed = herbsNow;
       audio.play("heal");
-      showBark("약초를 먹었어. 체력이 회복됐어!");
+      bark.show("약초를 먹었어. 체력이 회복됐어!");
     }
-    if (state.player.hp < hpBefore) { audio.play("hurt"); showBark("아야! 멧돼지에게 받혔어!"); }
+    if (state.player.hp < hpBefore) { audio.play("hurt"); bark.show("아야! 멧돼지에게 받혔어!"); }
   }
   if (stepped) refreshHud();
-  if (barkTimer > 0) { barkTimer -= dt; if (barkTimer <= 0) barkEl.style.display = "none"; }
+  bark.tick(dt);
 
   playerMesh.position.set(state.player.x, 0, state.player.y);
   for (const n of state.npcs) {

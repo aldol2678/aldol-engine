@@ -54,6 +54,12 @@
 - GLB 로딩은 렌더러에서만 일어난다. 심은 건드리지 않는다(결정성 유지). 로드 실패 시 원시(primitive) 폴백을 쓰고 게임은 그대로 시작한다.
 - 새 게임이 GLB를 쓰면 `tools/check-<game>.mjs`에 매직바이트 검증 + 프로브 훅(`assets.loaded/failed`) 확인을 넣는다.
 
+## HUD 킷 (공유 렌더 모듈)
+- 두 게임의 HUD(정보 패널·말풍선·프롬프트·도움말·둥근 버튼·음소거 버튼·의뢰 목록)는 `src/render/hud.js` 하나로 공유한다. 새 게임도 이 킷으로 HUD를 만든다 — CSS/HTML/배선을 게임마다 복사하지 않는다.
+- `installHudCss("forest" | "lake")`로 테마(색·크기·위치)만 고르고, `createHudPanel`·`createBark`·`createPrompt`·`createHelp`·`createRoundButton`·`bindMute`·`renderQuests`·`setSaveText`·`setPosText`로 조립한다. 요소 id는 킷 이전과 동일하게 유지한다(`#bark`·`#prompt`·`#help`·`#mute-btn`·`#zone`·`#quests`·`#save-state` …) — 프로브와 저장 코드가 그대로 동작한다.
+- HUD는 렌더 전용이다. 심 상태를 건드리지 않고, 결정성 해시에 영향을 주지 않는다. 말풍선 자동 숨김은 프레임 루프의 `bark.tick(dt)`로 처리한다(벽시계 `setTimeout` 금지).
+- 렌더 공유 모듈은 `src/render/`에 둔다 (`audio.js`, `asset-loader.js`, `hud.js`). 심 공유 코어(`src/core/`)와 다르다 — 심 규칙을 렌더 모듈에 넣지 않는다.
+
 ## AI 최소 집합 (M1)
 - 길찾기는 내비메시 (`src/core/navmesh.js`): 걷는 구역을 0.5 셀 격자로 나누고 집·나무·허수아비를 원형 장애물로 막는다. NPC는 직선이 뚫리면 직진, 막히면 A* + 직선 단축(string pulling) 경로를 따라간다. 경로는 결정적이다(힙 동점 해소는 삽입 순서). 심은 `world.navmesh`만 본다.
 - 소리 (`src/core/audio.js` + `src/render/audio.js`): 음성(낚시·입질·챔질·대화·의뢰·피격·회복·타격)은 오디오 파일 없이 WebAudio 오실레이터로 합성한다. 음정·길이 표는 코어에 두고(WebAudio 없이 테스트 가능), 재생은 렌더러에서만 한다. BGM은 C–Am–F–G 패드 4초 루프. 오디오는 게임 로직에 절대 영향을 주지 않으며, 로드 실패 시 소리만 안 나고 게임은 그대로 돌아간다. 음소거는 M 키 또는 🔊 버튼, `localStorage`에 저장한다.
