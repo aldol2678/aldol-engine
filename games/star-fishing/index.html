@@ -440,11 +440,13 @@ function readInput() {
   let dx = 0, dy = 0;
   if (keys.has("a") || keys.has("arrowleft")) dx -= 1;
   if (keys.has("d") || keys.has("arrowright")) dx += 1;
-  if (keys.has("w") || keys.has("arrowup")) dy += 1;
-  if (keys.has("s") || keys.has("arrowdown")) dy -= 1;
+  // Camera sits at +z looking -z, so up-screen is -y: W = dy -1, S = dy +1.
+  // (The old sign was backwards — W moved the player down-screen. Fixed 2026-11-21.)
+  if (keys.has("w") || keys.has("arrowup")) dy -= 1;
+  if (keys.has("s") || keys.has("arrowdown")) dy += 1;
   if (drag && Math.hypot(drag.dx, drag.dy) > 12) {
     dx += drag.dx / 60;
-    dy -= drag.dy / 60;
+    dy += drag.dy / 60;
   }
   const input = { dx, dy };
   if (castPressed) { input.cast = true; castPressed = false; }

@@ -300,11 +300,14 @@ const muteBtn = createRoundButton({ id: "mute-btn", label: "🔊", size: 44, fon
 bindMute(audio, muteBtn);
 
 function readInput() {
-  // Screen mapping: camera sits at +z looking -z, so W (up-screen) = +y, S = -y.
+  // Screen mapping: camera sits at +z (south of the player) looking -z
+  // (north), so the far side of the screen is -y. W/ArrowUp (up-screen)
+  // is dy = -1, S/ArrowDown is dy = +1. The old code had this backwards
+  // (W = +y moved the player down-screen) — fixed 2026-11-21.
   let dx = (keys["d"] || keys["arrowright"] ? 1 : 0) - (keys["a"] || keys["arrowleft"] ? 1 : 0);
-  let dy = (keys["w"] || keys["arrowup"] ? 1 : 0) - (keys["s"] || keys["arrowdown"] ? 1 : 0);
+  let dy = (keys["s"] || keys["arrowdown"] ? 1 : 0) - (keys["w"] || keys["arrowup"] ? 1 : 0);
   dx += touchVec.x;
-  dy -= touchVec.y;
+  dy += touchVec.y;
   const len = Math.hypot(dx, dy);
   if (len > 1) { dx /= len; dy /= len; }
   const input = { dx, dy };
