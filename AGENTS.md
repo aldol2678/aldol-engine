@@ -31,6 +31,10 @@
 - 예전에는 번 VM2 셀프호스트 러너(`aldol-burn-vm2`)를 썼다 — 2026-11-21에 `ubuntu-latest`로 전환했고(`8dd4820`, 실행 #26 Success), VM2는 2026-11-26 00:00 KST에 자동 삭제된다. 설치 스크립트 `tools/ci/install-runner-vm2.sh`는 참고용으로만 남는다.
 - `actions/checkout@v4`가 Node 20 대상이라 Node 24 러너에서 강제 실행 경고 1건이 뜬다. 실패는 아니다. 나중에 checkout을 v5로 올리면 사라진다.
 
+## WASM 검증 (수동 게이트)
+- `npm run verify:wasm` — Rust 크레이트에서 Node용 pkg를 다시 빌드하고 `verify.mjs`(112개 벡터, JS↔WASM 해시+상태 전문 일치)를 돌린다. 스크립트는 `tools/verify-wasm.sh` (크레이트는 워크스페이스 전용 `../wasm`, 레포에 없음).
+- WASM 관련 변경(Rust 소스·빌드된 .wasm) 푸시 전에 실행한다. pre-push 훅에는 넣지 않는다 — cargo 빌드가 느리고 툴체인이 워크스페이스 전용이라 클론만으로는 돌지 않는다 (알돌 결정 2026-11-21).
+
 ## 결정성 규칙 (절대)
 1. 시뮬레이션 경로는 순수 함수다. 렌더링·입력 장치·벽시계를 받지 않는다.
 2. 무작위성은 `src/core/rng.js`의 시드 RNG만 쓴다. `Math.random()`·`Date.now()`·`performance.now()`를 `src/core/`에서 쓰면 `npm run check`가 실패한다.
