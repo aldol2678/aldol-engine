@@ -21,16 +21,15 @@
 - `npm run simulate -- --seed <문자열> --frames <수> [--inputs <JSON>] [--world <경로>]` — 헤드리스 실행, 상태 해시 출력. 기본 월드는 `games/supuli/world.json`.
 
 ## 푸시 게이트 (로컬)
-- GitHub Actions 포함 분(3,000분)이 소진돼서 클라우드 CI는 못 쓴다. 대신 로컬 pre-push 훅이 푸시 문지기다.
+- 로컬 pre-push 훅이 푸시 문지기다.
 - `tools/hooks/pre-push`가 `npm run check:all`을 돌리고, 실패하면 푸시를 막는다. 클론마다 한 번 `sh tools/install-hooks.sh`로 설치한다 (git 훅은 버전 관리가 안 되니까 체크인된 스크립트를 심링크로 건다).
 - 스냅샷 푸시(push-files)에는 git 훅이 안 걸리니까, 그때는 푸시 전에 `npm run check:all`을 직접 돌린다.
 - **레포 루트 = m1/ 내용물 그대로.** 스냅샷 푸시의 source-dir은 m1/이고, 레포의 `README.md`는 m1/README.md(엔진 README)다. 워크스페이스 상위 폴더(`~/workspace/aldol-engine-step0/README.md`, 짧은 앞문)는 레포에 절대 푸시하지 말 것 — 레포 `README.md`를 덮어쓰고, 안에 있는 `m1/...` 링크는 레포에 없는 경로라 전부 깨진다 (2026-11-21 라이브 배포 때 실제로 덮어쓴 뒤 복원함).
 
-## CI (임시 셀프호스트 러너)
-- GitHub-hosted 분이 소진돼서 클라우드 CI는 못 쓰지만, 번 VM2(`aldol-burn-vm2`, n2-standard-16, 미국 중부)에 셀프호스트 러너가 떠 있다. 프라이빗 레포라 포함 분을 안 먹는다.
-- `.github/workflows/check.yml`이 main 푸시/PR 때 `npm run check:all`을 러너에서 돌린다. 러너 라벨 `burn-vm2`.
-- 설치 스크립트 `tools/ci/install-runner-vm2.sh` (전용 비-root 계정 `actions-runner`로 설치 — config.sh가 root를 거부한다). 토큰은 1시간짜리 등록 토큰이라 재설치 때는 새로 받아야 한다.
-- 임시 러너다: VM2가 2026-11-26 00:00 KST에 자동 삭제되면 러너도 같이 사라진다. 그 뒤엔 로컬 pre-push 훅만 남는다.
+## CI (GitHub-hosted)
+- `.github/workflows/check.yml`이 main 푸시/PR 때 `npm run check:all`을 GitHub 호스트 러너(`ubuntu-latest`)에서 돌린다. 레포가 공개(Public)라 호스트 분은 무료다.
+- 예전에는 번 VM2 셀프호스트 러너(`aldol-burn-vm2`)를 썼다 — 2026-11-21에 `ubuntu-latest`로 전환했고(`8dd4820`, 실행 #26 Success), VM2는 2026-11-26 00:00 KST에 자동 삭제된다. 설치 스크립트 `tools/ci/install-runner-vm2.sh`는 참고용으로만 남는다.
+- `actions/checkout@v4`가 Node 20 대상이라 Node 24 러너에서 강제 실행 경고 1건이 뜬다. 실패는 아니다. 나중에 checkout을 v5로 올리면 사라진다.
 
 ## 결정성 규칙 (절대)
 1. 시뮬레이션 경로는 순수 함수다. 렌더링·입력 장치·벽시계를 받지 않는다.
