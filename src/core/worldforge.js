@@ -175,6 +175,8 @@ export function worldToSim(world) {
   const combat = combatRule ? combatRule.config : { contactDamage: 10, contactCooldownTicks: 60, playerHp: 100, fleeHp: 25 };
   const fishingRule = world.rules.find((r) => r.type === "game.fishing" && r.enabled !== false);
   const fishing = fishingRule ? fishingRule.config : null;
+  const defenseRule = world.rules.find((r) => r.type === "game.defense" && r.enabled !== false);
+  const defense = defenseRule ? defenseRule.config : null;
 
   const placeMap = {};
   for (const p of world.places) placeMap[p.id] = toSim(p.position);
@@ -187,5 +189,5 @@ export function worldToSim(world) {
   ];
   const navmesh = buildNavmesh({ bounds: { minX, maxX, minY, maxY }, obstacles });
 
-  return { worldId: world.world.id, bounds: { minX, maxX, minY, maxY }, waypoints, edges, houses, trees, shards, crops, herbs, scarecrows, trophies, reeds, npcs, spawn, quests, combat, fishing, places: placeMap, navmesh };
+  return { worldId: world.world.id, bounds: { minX, maxX, minY, maxY }, waypoints, edges, houses, trees, shards, crops, herbs, scarecrows, trophies, reeds, npcs, spawn, quests, combat, fishing, defense, places: placeMap, navmesh };
 }

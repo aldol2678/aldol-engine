@@ -2,14 +2,15 @@
 //
 // Render-side only: builds the info panel, bark/prompt/help floats, round
 // action buttons and the mute button, and renders the quest list. Never
-// touches sim state. Both games (Supuli, Star Fishing) build their HUD from
-// this kit so the same markup, CSS and wiring are not copied per game.
+// touches sim state. All three games (Supuli, Star Fishing, Star Defense)
+// build their HUD from this kit so the same markup, CSS and wiring are not
+// copied per game.
 //
 // Usage (one game page):
 //   import { installHudCss, createHudPanel, createBark, createPrompt,
 //            createHelp, createRoundButton, bindMute, renderQuests,
 //            setSaveText, setPosText } from "../../src/render/hud.js";
-//   installHudCss("forest");                    // "forest" (Supuli) or "lake" (Star Fishing)
+//   installHudCss("forest");                    // "forest" (Supuli), "lake" (Star Fishing) or "night" (Star Defense)
 //   const panel = createHudPanel({ title: "...", rows: ["zone", "quests", ...] });
 //   const bark = createBark();
 //   const prompt = createPrompt("E: 대화하기");
@@ -58,6 +59,23 @@ const THEMES = {
     helpBg: "rgba(10, 20, 30, 0.6)",
     helpFg: "#cfe8ff",
   },
+  night: {
+    pageBg: "#0a0e1e",
+    panelBg: "rgba(10, 14, 30, 0.8)",
+    panelFg: "#e8ecff",
+    panelPadding: "12px 14px",
+    titleSize: "16px",
+    bodySize: "14px",
+    done: "#8affc1",
+    todo: "#cdd6ff",
+    barkBg: "#fffbe8",
+    barkFg: "#222",
+    barkBottom: "150px",
+    promptBottom: "96px",
+    floatSize: "15px",
+    helpBg: "rgba(10, 14, 30, 0.65)",
+    helpFg: "#cdd6ff",
+  },
 };
 
 const CSS = `
@@ -78,6 +96,12 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: 
 #help.right { right: 12px; }
 #help.center { left: 50%; transform: translateX(-50%); max-width: calc(100vw - 24px); text-align: center; }
 .hud-btn { position: absolute; border: none; border-radius: 50%; color: #fff; display: flex; align-items: center; justify-content: center; font-family: inherit; font-size: 15px; font-weight: bold; padding: 0; user-select: none; touch-action: none; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.4); }
+/* Narrow screens: the top-left panel and the top-right phase panel overlap
+   at full width — shrink both so the title stays readable. */
+@media (max-width: 640px) {
+  .hud-panel { max-width: 52vw; }
+  .hud-panel.top-right { max-width: 40vw; }
+}
 `;
 
 let cssInstalled = false;

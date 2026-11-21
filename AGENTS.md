@@ -46,7 +46,13 @@
 ## M2 — 두 번째 게임 (재사용 증명)
 - 공유 코어는 `src/core/`만이다: `rng.js` (시드 RNG), `state-hash.js` (결정성 해시), `worldforge.js` (매니페스트 검증 + sim 변환). 게임별 규칙은 각 게임 폴더의 심(`games/<game>/*.js`)에 둔다 — 수풀리 `sim.js`를 복사해서 고치지 않는다.
 - 새 게임은 `games/<game>/world.json` (WorldForge 0.1 매니페스트) + 심 + `index.html` + `tools/check-<game>.mjs` + `package.json` 스크립트(`check:<game>`)로 구성한다. 저장 키는 게임마다 별도(`aldol-engine.<game>-m2.save.v1`).
-- `worldforge.js`를 바꿀 때는 양쪽 게임 체크(`npm run check` + `npm run check:fishing`)를 둘 다 돌린다. 어댑터에 게임별 필드를 추가할 때는 기본값(null/빈 배열)을 두고, 기존 게임이 안 쓰는 필드는 건드리지 않는다.
+- `worldforge.js`를 바꿀 때는 세 게임 체크(`npm run check` + `npm run check:fishing` + `npm run check:star-defense`)를 다 돌린다. 어댑터에 게임별 필드를 추가할 때는 기본값(null/빈 배열)을 두고, 기존 게임이 안 쓰는 필드는 건드리지 않는다.
+
+## M3 — 세 번째 게임 (공개 준비)
+- 세 번째 게임은 **별수호 디펜스** (`games/star-defense/`, 타워 디펜스): 매니페스트 `game.defense` 규칙(타워 2종·적 3종·웨이브 5개·길·터 7개) + 심 `defense.js` + `index.html` + `tools/check-star-defense.mjs`. 저장 키 `aldol-engine.star-defense-m3.save.v1`, 결정성 해시 `0d316768` (seed `star-defense-m3`, 600프레임, `[{startWave:true}]`).
+- TD 규칙: 배치 단계에 별탑 배치(별 = 화폐) → 웨이브 시작 → 그림자 적이 매니페스트 길을 따라 별 제단으로 이동 → 타워가 자동 발사(유도 투사체) → 제단 HP 0이면 패배, 5웨이브 클리어하면 승리. 진행 중인 웨이브는 저장하지 않는다 — 불러오면 배치 단계로 돌아가고 미완 웨이브는 처음부터 다시 한다.
+- 제단 모델은 별낚시의 `star-trophy.glb`를 이 게임 폴더(`games/star-defense/assets/models/`)에 복사해서 쓴다. GLB는 텍스트 푸시로 올릴 수 없다 — 브라우저 웹 UI 업로드로만 올릴 것(바이너리 이중 인코딩 사고 참조).
+- HUD는 킷의 `night` 테마. 좁은 화면(≤640px)에서 상단 두 패널이 겹치지 않게 킷 CSS에 미디어 쿼리가 있다.
 
 ## 에셋 (GLB 파이프라인)
 - 매니페스트 에셋 URI는 `builtin:<이름>` 또는 `glb:<게임 폴더 안 상대 경로>.glb`만 된다. 상위 폴더(`..`)·절대 경로·외부 URL은 검증이 거부한다.
@@ -55,8 +61,8 @@
 - 새 게임이 GLB를 쓰면 `tools/check-<game>.mjs`에 매직바이트 검증 + 프로브 훅(`assets.loaded/failed`) 확인을 넣는다.
 
 ## HUD 킷 (공유 렌더 모듈)
-- 두 게임의 HUD(정보 패널·말풍선·프롬프트·도움말·둥근 버튼·음소거 버튼·의뢰 목록)는 `src/render/hud.js` 하나로 공유한다. 새 게임도 이 킷으로 HUD를 만든다 — CSS/HTML/배선을 게임마다 복사하지 않는다.
-- `installHudCss("forest" | "lake")`로 테마(색·크기·위치)만 고르고, `createHudPanel`·`createBark`·`createPrompt`·`createHelp`·`createRoundButton`·`bindMute`·`renderQuests`·`setSaveText`·`setPosText`로 조립한다. 요소 id는 킷 이전과 동일하게 유지한다(`#bark`·`#prompt`·`#help`·`#mute-btn`·`#zone`·`#quests`·`#save-state` …) — 프로브와 저장 코드가 그대로 동작한다.
+- 세 게임의 HUD(정보 패널·말풍선·프롬프트·도움말·둥근 버튼·음소거 버튼·의뢰 목록)는 `src/render/hud.js` 하나로 공유한다. 새 게임도 이 킷으로 HUD를 만든다 — CSS/HTML/배선을 게임마다 복사하지 않는다.
+- `installHudCss("forest" | "lake" | "night")`로 테마(색·크기·위치)만 고르고, `createHudPanel`·`createBark`·`createPrompt`·`createHelp`·`createRoundButton`·`bindMute`·`renderQuests`·`setSaveText`·`setPosText`로 조립한다. 요소 id는 킷 이전과 동일하게 유지한다(`#bark`·`#prompt`·`#help`·`#mute-btn`·`#zone`·`#quests`·`#save-state` …) — 프로브와 저장 코드가 그대로 동작한다. 좁은 화면(≤640px)에서는 상단 두 패널이 겹치지 않게 킷 CSS 미디어 쿼리로 패널 최대 너비를 줄인다.
 - HUD는 렌더 전용이다. 심 상태를 건드리지 않고, 결정성 해시에 영향을 주지 않는다. 말풍선 자동 숨김은 프레임 루프의 `bark.tick(dt)`로 처리한다(벽시계 `setTimeout` 금지).
 - 렌더 공유 모듈은 `src/render/`에 둔다 (`audio.js`, `asset-loader.js`, `hud.js`). 심 공유 코어(`src/core/`)와 다르다 — 심 규칙을 렌더 모듈에 넣지 않는다.
 

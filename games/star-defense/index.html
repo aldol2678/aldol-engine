@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>별수호 디펜스 M3 — 별 제단 지키기 | Aldol Engine</title>
+</head>
+<body>
+<div id="app"></div>
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.187.0/build/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { Rng } from "../../src/core/rng.js";
+import { stateHash } from "../../src/core/state-hash.js";
+import { validateWorldManifest, worldToSim } from "../../src/core/worldforge.js";
+import { createInitialState, step, SEED, TICK } from "./defense.js";
+import { createAssetLoader } from "../../src/render/asset-loader.js";
+import { createAudioManager } from "../../src/render/audio.js";
+import {
+  installHudCss, createHudPanel, createBark, createHelp,
+  createRoundButton, bindMute, renderQuests, setSaveText,
+} from "../../src/render/hud.js";
+
+const SAVE_KEY = "aldol-engine.star-defense-m3.save.v1";
+
+const worldRes = await fetch("./world.json");
+const manifest = await worldRes.json();
+const validation = validateWorldManifest(manifest);
+if (!validation.valid) throw new Error("invalid manifest: " + JSON.stringify(validation.errors));
+const world = worldToSim(manifest);
+const defense = world.defense;
+
+// GLB assets (renderer-side only; a failed load falls back to primitives).
+const assetLoader = createAssetLoader({ baseUrl: "./" });
+const assets = await assetLoader.loadAll(manifest);
+const assetStatus = { loaded: [...assets.loaded.keys()], failed: assets.failed };
+
+// Audio: procedural WebAudio voices (no audio files). BGM starts on the first gesture.
+const audio = createAudioManager();
+audio.setMuted(localStorage.getItem("aldol-engine.audio.muted") === "1");
+window.addEventListener("pointerdown", () => audio.startBgm(), { once: true });
+window.addEventListener("keydown", () => audio.startBgm(), { once: true });
+
+const rng = new Rng(SEED);
+let state = createInitialState(SEED, world);
+
+// --- HUD (shared kit: src/render/hud.js, night theme) ---
+installHudCss("night");
+const panel = createHudPanel({
+  id: "hud",
+  title: "별수호 디펜스 M3 — 별 제단 지키기",
+  rows: [
+    { id: "wave", tag: "div" },
+    { id: "stars", tag: "div" },
+    { id: "selected", tag: "div" },
+    { id: "shrine", tag: "div" },
+    { tag: "div", className: "hpbar", html: '<div id="hpfill"></div>' },
+    { id: "quests", tag: "div" },
+    { id: "save-state", tag: "div" },
+  ],
+});
+const phasePanel = createHudPanel({
+  id: "phase",
+  position: "right",
+  style: { color: "#ffe9a8", padding: "10px 14px", fontSize: "15px" },
+});
+const bark = createBark();
+createHelp("클릭: 별탑 배치 · 1/2: 타워 선택 · 스페이스: 웨이브 시작 · M: 음소거", "center");
+
+// --- Save / load. ---
+// Saved: stars, shrine HP, cleared waves, kills, towers, quests. A wave in
+// progress is NOT saved — on load the game returns to the build phase and
+// the unfinished wave restarts (enemies/projectiles/spawn queue are dropped).
+function saveGame(note) {
+  localStorage.setItem(SAVE_KEY, JSON.stringify({
+    stars: state.stars,
+    shrineHp: state.shrineHp,
+    wave: state.wavesCleared,
+    wavesCleared: state.wavesCleared,
+    kills: state.kills,
+    towers: state.towers.map((t) => ({ spotId: t.spotId, type: t.type })),
+    quests: state.quests.map((q) => ({ id: q.id, done: q.done, progress: q.progress })),
+    tick: state.tick, savedAt: Date.now(),
+  }));
+  setSaveText(panel.slots["save-state"], note);
+}
+function loadGame() {
+  let saved;
+  try { saved = JSON.parse(localStorage.getItem(SAVE_KEY) || "null"); } catch { saved = null; }
+  if (!saved) return;
+  if (typeof saved.stars === "number") state.stars = saved.stars;
+  if (typeof saved.shrineHp === "number") state.shrineHp = saved.shrineHp;
+  if (typeof saved.wavesCleared === "number") {
+    state.wavesCleared = saved.wavesCleared;
+    state.wave = saved.wavesCleared;
+  }
+  if (typeof saved.kills === "number") state.kills = saved.kills;
+  if (Array.isArray(saved.towers)) {
+    state.towers = [];
+    state.towerSeq = 0;
+    for (const st of saved.towers) {
+      const spot = state._spots[st.spotId];
+      if (!spot) continue;
+      state.towerSeq += 1;
+      state.towers.push({ id: `tower-${state.towerSeq}`, spotId: st.spotId, type: st.type, x: spot.x, y: spot.y, cooldownUntil: 0 });
+    }
+  }
+  if (Array.isArray(saved.quests)) {
+    for (const sq of saved.quests) {
+      const q = state.quests.find((x) => x.id === sq.id);
+      if (q) { q.done = !!sq.done; q.progress = sq.progress ?? 0; }
+    }
+  }
+  state.phase = "build";
+  state.enemies = [];
+  state.projectiles = [];
+  state.spawnQueue = [];
+  setSaveText(panel.slots["save-state"], "불러옴");
+}
+loadGame();
+
+// --- Three.js scene (night field, star sky, winding path, shrine). ---
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+document.getElementById("app").appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x0a0e1e, 35, 95);
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 200);
+function fitCamera() {
+  const aspect = window.innerWidth / window.innerHeight;
+  const k = Math.min(2.2, Math.max(1, 1.15 / aspect));
+  camera.aspect = aspect;
+  camera.position.set(0, 17 * k, 11 * k);
+  camera.lookAt(0, 0, -0.5);
+  camera.updateProjectionMatrix();
+}
+fitCamera();
+
+// Night sky dome (deep blue top -> lighter horizon) + stars + moon.
+const sky = new THREE.Mesh(
+  new THREE.SphereGeometry(80, 16, 12),
+  new THREE.ShaderMaterial({
+    side: THREE.BackSide,
+    fog: false,
+    vertexShader: `varying vec3 vPos; void main() { vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `varying vec3 vPos; void main() { float h = normalize(vPos).y; vec3 top = vec3(0.04, 0.05, 0.14); vec3 bot = vec3(0.13, 0.16, 0.30); gl_FragColor = vec4(mix(bot, top, smoothstep(-0.2, 0.4, h)), 1.0); }`,
+  })
+);
+scene.add(sky);
+const visualRng = new Rng(SEED + ":visual");
+const STAR_N = 320;
+const starPos = new Float32Array(STAR_N * 3);
+for (let i = 0; i < STAR_N; i++) {
+  const a = visualRng.next() * Math.PI * 2;
+  const y = 8 + visualRng.next() * 55;
+  const r = 45 + visualRng.next() * 25;
+  starPos[i * 3] = Math.cos(a) * r;
+  starPos[i * 3 + 1] = y;
+  starPos[i * 3 + 2] = Math.sin(a) * r - 10;
+}
+const starGeo = new THREE.BufferGeometry();
+starGeo.setAttribute("position", new THREE.BufferAttribute(starPos, 3));
+const starPoints = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.55, fog: false, transparent: true, opacity: 0.9 }));
+scene.add(starPoints);
+const moon = new THREE.Mesh(
+  new THREE.CircleGeometry(4, 32),
+  new THREE.MeshBasicMaterial({ color: 0xf5f0d8, fog: false })
+);
+moon.position.set(-28, 26, -55);
+scene.add(moon);
+
+scene.add(new THREE.HemisphereLight(0x8fa3ff, 0x1a2b1a, 0.5));
+const moonlight = new THREE.DirectionalLight(0xdde6ff, 1.2);
+moonlight.position.set(8, 20, 6);
+moonlight.castShadow = true;
+moonlight.shadow.mapSize.set(2048, 2048);
+moonlight.shadow.camera.left = -12;
+moonlight.shadow.camera.right = 12;
+moonlight.shadow.camera.top = 12;
+moonlight.shadow.camera.bottom = -12;
+moonlight.shadow.camera.near = 1;
+moonlight.shadow.camera.far = 50;
+moonlight.shadow.bias = -0.0005;
+moonlight.target.position.set(0, 0, 0);
+scene.add(moonlight, moonlight.target);
+
+// Ground (dark night field).
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(18, 12),
+  new THREE.MeshStandardMaterial({ color: 0x16241c, roughness: 1 })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.position.set(0, 0, 0);
+ground.receiveShadow = true;
+scene.add(ground);
+
+// Path ribbon: stone boxes between consecutive waypoints.
+const pathMat = new THREE.MeshStandardMaterial({ color: 0x8a7a5a, roughness: 1 });
+const pathPts = defense.path.map((id) => world.places[id]);
+for (let i = 0; i < pathPts.length - 1; i++) {
+  const a = pathPts[i];
+  const b = pathPts[i + 1];
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len = Math.hypot(dx, dy);
+  const seg = new THREE.Mesh(new THREE.BoxGeometry(len, 0.06, 1.6), pathMat);
+  seg.position.set((a.x + b.x) / 2, 0.03, (a.y + b.y) / 2);
+  seg.rotation.y = -Math.atan2(dy, dx);
+  seg.receiveShadow = true;
+  scene.add(seg);
+}
+
+// Gate (west end): two pillars + beam + glowing portal.
+const gateMat = new THREE.MeshStandardMaterial({ color: 0x3a3f5a, roughness: 0.9 });
+for (const gz of [-1.2, 1.2]) {
+  const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.5, 2.6, 0.5), gateMat);
+  pillar.position.set(-8, 1.3, gz);
+  pillar.castShadow = true;
+  scene.add(pillar);
+}
+const beam = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 2.9), gateMat);
+beam.position.set(-8, 2.75, 0);
+beam.castShadow = true;
+scene.add(beam);
+const portal = new THREE.Mesh(
+  new THREE.CircleGeometry(1.0, 24),
+  new THREE.MeshBasicMaterial({ color: 0x7b2ff7, transparent: true, opacity: 0.5, side: THREE.DoubleSide })
+);
+portal.position.set(-8, 1.3, 0);
+portal.rotation.y = Math.PI / 2;
+scene.add(portal);
+
+// Shrine pedestal + star trophy (GLB; gold octahedron if the load failed).
+const pedestal = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.9, 1.1, 0.5, 12),
+  new THREE.MeshStandardMaterial({ color: 0x6b7280, roughness: 0.8 })
+);
+pedestal.position.set(8, 0.25, -3);
+pedestal.castShadow = true;
+pedestal.receiveShadow = true;
+scene.add(pedestal);
+const shrineLight = new THREE.PointLight(0xffd700, 12, 9, 1.5);
+shrineLight.position.set(8, 3, -3);
+scene.add(shrineLight);
+let trophyMesh = null;
+for (const t of world.trophies || []) {
+  let mesh = t.assetId ? assetLoader.instance(assets.loaded, t.assetId) : null;
+  if (!mesh) {
+    mesh = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.5),
+      new THREE.MeshStandardMaterial({ color: 0xffd700, roughness: 0.3, metalness: 0.6 })
+    );
+  }
+  mesh.position.set(t.x, t.height, t.y);
+  mesh.userData.baseY = t.height;
+  scene.add(mesh);
+  trophyMesh = mesh;
+}
+
+// Trees: trunk + two stacked cones.
+const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4a3520, roughness: 1 });
+const leafMat1 = new THREE.MeshStandardMaterial({ color: 0x1d4a2a, roughness: 1 });
+const leafMat2 = new THREE.MeshStandardMaterial({ color: 0x245c33, roughness: 1 });
+for (const t of world.trees || []) {
+  const g = new THREE.Group();
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.2, 0.9, 8), trunkMat);
+  trunk.position.y = 0.45;
+  trunk.castShadow = true;
+  const c1 = new THREE.Mesh(new THREE.ConeGeometry(0.8, 1.4, 8), leafMat1);
+  c1.position.y = 1.5;
+  c1.castShadow = true;
+  const c2 = new THREE.Mesh(new THREE.ConeGeometry(0.55, 1.0, 8), leafMat2);
+  c2.position.y = 2.3;
+  c2.castShadow = true;
+  g.add(trunk, c1, c2);
+  g.position.set(t.x, 0, t.y);
+  scene.add(g);
+}
+
+// Build spots: glowing ring + hit disc (raycast target).
+const spotMeshes = [];
+const spotRingMat = new THREE.MeshBasicMaterial({ color: 0x66e0ff, transparent: true, opacity: 0.7, side: THREE.DoubleSide });
+const spotDiscMat = new THREE.MeshBasicMaterial({ color: 0x66e0ff, transparent: true, opacity: 0.12, side: THREE.DoubleSide });
+for (const id of defense.buildSpots) {
+  const p = world.places[id];
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.75, 24), spotRingMat.clone());
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.set(p.x, 0.06, p.y);
+  const disc = new THREE.Mesh(new THREE.CircleGeometry(0.85, 24), spotDiscMat.clone());
+  disc.rotation.x = -Math.PI / 2;
+  disc.position.set(p.x, 0.05, p.y);
+  disc.userData.spotId = id;
+  scene.add(ring, disc);
+  spotMeshes.push(disc);
+  disc.userData.ring = ring;
+}
+function refreshSpotRings() {
+  const occupied = new Set(state.towers.map((t) => t.spotId));
+  for (const disc of spotMeshes) {
+    const taken = occupied.has(disc.userData.spotId);
+    disc.userData.ring.material.opacity = taken ? 0.15 : 0.7;
+    disc.material.opacity = taken ? 0.04 : 0.12;
+  }
+}
+refreshSpotRings();
+
+// Towers, enemies, projectiles: meshes synced from sim state each frame.
+const towerMeshes = new Map();
+const enemyMeshes = new Map();
+const projMeshes = new Map();
+const TOWER_STYLE = {
+  star: { column: 0xd4a017, top: 0xffd700 },
+  moon: { column: 0x9aa5c8, top: 0xcdd6ff },
+};
+function makeTowerMesh(type) {
+  const style = TOWER_STYLE[type] || TOWER_STYLE.star;
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.55, 0.3, 12), new THREE.MeshStandardMaterial({ color: 0x6b7280, roughness: 0.8 }));
+  base.position.y = 0.15;
+  base.castShadow = true;
+  const column = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.32, 0.9, 10), new THREE.MeshStandardMaterial({ color: style.column, roughness: 0.5, metalness: 0.3 }));
+  column.position.y = 0.75;
+  column.castShadow = true;
+  let top;
+  if (type === "moon") {
+    top = new THREE.Mesh(new THREE.SphereGeometry(0.36, 14, 12), new THREE.MeshStandardMaterial({ color: style.top, roughness: 0.3, metalness: 0.2, emissive: 0x334477 }));
+  } else {
+    top = new THREE.Mesh(new THREE.OctahedronGeometry(0.42), new THREE.MeshStandardMaterial({ color: style.top, roughness: 0.3, metalness: 0.6 }));
+  }
+  top.position.y = 1.5;
+  top.castShadow = true;
+  g.add(base, column, top);
+  g.userData.top = top;
+  return g;
+}
+const ENEMY_STYLE = {
+  wisp: { color: 0x5b2a86, r: 0.35 },
+  swift: { color: 0x22d3ee, r: 0.25 },
+  brute: { color: 0x7f1d1d, r: 0.55 },
+};
+function makeEnemyMesh(kind) {
+  const style = ENEMY_STYLE[kind] || ENEMY_STYLE.wisp;
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.SphereGeometry(style.r, 14, 12), new THREE.MeshStandardMaterial({ color: style.color, roughness: 0.6 }));
+  body.castShadow = true;
+  g.add(body);
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  for (const ex of [-0.12, 0.12]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 6), eyeMat);
+    eye.position.set(ex * (style.r / 0.35), 0.08, style.r * 0.85);
+    g.add(eye);
+  }
+  return g;
+}
+const PROJ_COLOR = { star: 0xffd700, moon: 0x9db4ff };
+
+// Wave-clear sparkles: 48 gold points, burst on clear.
+const SPARK_N = 48;
+const sparkPos = new Float32Array(SPARK_N * 3);
+const sparkVel = new Float32Array(SPARK_N * 3);
+const sparkGeo = new THREE.BufferGeometry();
+sparkGeo.setAttribute("position", new THREE.BufferAttribute(sparkPos, 3));
+const sparkMat = new THREE.PointsMaterial({ color: 0xffd700, size: 0.25, transparent: true, opacity: 0 });
+const sparks = new THREE.Points(sparkGeo, sparkMat);
+sparks.visible = false;
+scene.add(sparks);
+let sparkLife = 0;
+function burstSparkles(x, y, z) {
+  for (let i = 0; i < SPARK_N; i++) {
+    sparkPos[i * 3] = x;
+    sparkPos[i * 3 + 1] = y;
+    sparkPos[i * 3 + 2] = z;
+    const a = visualRng.next() * Math.PI * 2;
+    const up = 1.5 + visualRng.next() * 2;
+    const out = 0.5 + visualRng.next() * 1.5;
+    sparkVel[i * 3] = Math.cos(a) * out;
+    sparkVel[i * 3 + 1] = up;
+    sparkVel[i * 3 + 2] = Math.sin(a) * out;
+  }
+  sparkGeo.attributes.position.needsUpdate = true;
+  sparkLife = 1;
+  sparks.visible = true;
+}
+
+// --- Input: tower selection, wave start, spot clicks. ---
+let selectedType = "star";
+let placeTower = null;
+let startWavePressed = false;
+const raycaster = new THREE.Raycaster();
+const pointerNdc = new THREE.Vector2();
+const starBtn = createRoundButton({ id: "tower-star-btn", label: "★ 별빛 30", size: 64, fontSize: 13, right: 176, bottom: 64, background: "rgba(180, 140, 20, 0.9)", onPress: () => selectTower("star") });
+const moonBtn = createRoundButton({ id: "tower-moon-btn", label: "☾ 달빛 60", size: 64, fontSize: 13, right: 104, bottom: 64, background: "rgba(90, 110, 180, 0.9)", onPress: () => selectTower("moon") });
+const waveBtn = createRoundButton({ id: "wave-btn", label: "▶ 웨이브", size: 72, right: 12, bottom: 64, background: "rgba(160, 50, 90, 0.9)", onPress: () => { startWavePressed = true; } });
+const muteBtn = createRoundButton({ id: "mute-btn", label: "🔊", size: 44, right: 16, bottom: 148, background: "rgba(20, 30, 60, 0.85)" });
+bindMute(audio, muteBtn);
+function selectTower(type) {
+  selectedType = type;
+  starBtn.style.boxShadow = type === "star" ? "0 0 0 3px #fff" : "0 2px 8px rgba(0,0,0,.4)";
+  moonBtn.style.boxShadow = type === "moon" ? "0 0 0 3px #fff" : "0 2px 8px rgba(0,0,0,.4)";
+  refreshHud();
+}
+// Initial selection highlight (selectTower itself calls refreshHud, which
+// lives in the HUD section below — so only the style is set here).
+starBtn.style.boxShadow = "0 0 0 3px #fff";
+window.addEventListener("keydown", (e) => {
+  if (e.key === "1") selectTower("star");
+  if (e.key === "2") selectTower("moon");
+  if (e.key === " ") { startWavePressed = true; e.preventDefault(); }
+});
+renderer.domElement.addEventListener("pointerdown", (e) => {
+  pointerNdc.set((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1);
+  raycaster.setFromCamera(pointerNdc, camera);
+  const hits = raycaster.intersectObjects(spotMeshes, false);
+  if (hits.length === 0) return;
+  const spotId = hits[0].object.userData.spotId;
+  const cfg = defense.towers[selectedType];
+  if (state.towers.some((t) => t.spotId === spotId)) {
+    bark.show("이미 타워가 있는 자리예요");
+    return;
+  }
+  if (state.stars < cfg.cost) {
+    bark.show(`별이 부족해요! (${cfg.cost}별 필요)`);
+    return;
+  }
+  if (state.phase !== "build" && state.phase !== "combat") return;
+  placeTower = { spotId, type: selectedType };
+});
+
+function readInput() {
+  const input = {};
+  if (placeTower) { input.placeTower = placeTower; placeTower = null; }
+  if (startWavePressed) { input.startWave = true; startWavePressed = false; }
+  return input;
+}
+
+// --- HUD. ---
+const waveEl = panel.slots["wave"];
+const starsEl = panel.slots["stars"];
+const selectedEl = panel.slots["selected"];
+const shrineEl = panel.slots["shrine"];
+const questsEl = panel.slots["quests"];
+const phaseEl = phasePanel.el;
+const hpFill = document.getElementById("hpfill");
+const barkRng = new Rng(SEED + ":bark");
+const BARKS = {
+  waveClear: ["웨이브 클리어!", "잘 막았어! 보너스 별을 받았어."],
+  leak: ["제단이 공격받았어요!", "그림자가 제단에 닿았어!"],
+  quest: ["의뢰 완료!", "잘했어!"],
+  win: ["별 제단을 지켰어요! 승리!"],
+  lose: ["제단이 무너졌어요…"],
+};
+
+function refreshHud() {
+  const totalWaves = (defense.waves || []).length;
+  waveEl.textContent = state.phase === "won" ? `웨이브: ${totalWaves} / ${totalWaves} 클리어` :
+    state.phase === "lost" ? `웨이브: ${state.wave} / ${totalWaves} (패배)` :
+    state.phase === "combat" ? `웨이브: ${state.wave} / ${totalWaves} (전투 중)` :
+    `웨이브: ${state.wavesCleared} / ${totalWaves} 클리어 · 배치 단계`;
+  starsEl.textContent = `별: ${state.stars} · 처치: ${state.kills}마리`;
+  const cfg = defense.towers[selectedType];
+  selectedEl.textContent = `선택 타워: ${selectedType === "star" ? "별빛탑" : "달빛탑"} (${cfg.cost}별)`;
+  shrineEl.textContent = `제단 HP: ${state.shrineHp} / ${state.shrineMaxHp}`;
+  if (hpFill) hpFill.style.width = `${Math.max(0, (state.shrineHp / state.shrineMaxHp) * 100)}%`;
+  renderQuests(questsEl, state.quests, (q) =>
+    q.type === "quest.build" ? ` (${q.progress}/1)` :
+    q.type === "quest.defeat" ? ` (${q.progress}/20)` : "");
+  phaseEl.textContent =
+    state.phase === "won" ? "승리! 별 제단을 지켰어요 ★" :
+    state.phase === "lost" ? "패배… 제단이 무너졌어요" :
+    state.phase === "combat" ? `웨이브 ${state.wave} 진행 중 — 적이 제단으로 오고 있어요!` :
+    "배치 단계 — 별탑을 놓고 ▶ 웨이브 시작";
+}
+
+// --- Main loop (fixed step 1/60). ---
+let last = performance.now();
+let acc = 0;
+let lastSave = 0;
+const wasDone = new Map(state.quests.map((q) => [q.id, q.done]));
+let prevKills = state.kills;
+let prevShrineHp = state.shrineHp;
+let prevWavesCleared = state.wavesCleared;
+let prevPhase = state.phase;
+let prevTowerCount = state.towers.length;
+
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min((now - last) / 1000, 0.1);
+  last = now;
+  acc += dt;
+  let stepped = false;
+  while (acc >= TICK) {
+    acc -= TICK;
+    state = step(state, readInput(), rng, world);
+    stepped = true;
+  }
+  if (stepped) {
+    for (const q of state.quests) {
+      if (q.done && !wasDone.get(q.id)) {
+        wasDone.set(q.id, true);
+        audio.play("quest");
+        bark.show(barkRng.pick(BARKS.quest));
+        saveGame("의뢰 완료, 저장됨");
+      }
+    }
+    if (state.kills > prevKills) {
+      prevKills = state.kills;
+      audio.play("bite");
+    }
+    if (state.shrineHp < prevShrineHp) {
+      prevShrineHp = state.shrineHp;
+      audio.play("hurt");
+      bark.show(barkRng.pick(BARKS.leak));
+    }
+    if (state.wavesCleared > prevWavesCleared) {
+      prevWavesCleared = state.wavesCleared;
+      audio.play("quest");
+      bark.show(barkRng.pick(BARKS.waveClear));
+      const shrine = world.places["shrine"];
+      if (shrine) burstSparkles(shrine.x, 2.5, shrine.y);
+      saveGame("웨이브 클리어, 저장됨");
+    }
+    if (state.towers.length > prevTowerCount) {
+      prevTowerCount = state.towers.length;
+      audio.play("cast");
+      refreshSpotRings();
+      saveGame("별탑 배치, 저장됨");
+    }
+    if (prevPhase !== "won" && state.phase === "won") {
+      audio.play("quest");
+      bark.show(barkRng.pick(BARKS.win));
+      saveGame("승리, 저장됨");
+    }
+    if (prevPhase !== "lost" && state.phase === "lost") {
+      audio.play("hurt");
+      bark.show(barkRng.pick(BARKS.lose));
+      saveGame("패배, 저장됨");
+    }
+    prevPhase = state.phase;
+    if (now - lastSave > 5000) { saveGame(); lastSave = now; }
+    refreshHud();
+  }
+  bark.tick(dt);
+
+  const t = now / 1000;
+
+  // Sync towers.
+  for (const tw of state.towers) {
+    let m = towerMeshes.get(tw.id);
+    if (!m) {
+      m = makeTowerMesh(tw.type);
+      m.position.set(tw.x, 0, tw.y);
+      scene.add(m);
+      towerMeshes.set(tw.id, m);
+    }
+    m.userData.top.rotation.y += dt * 1.5;
+  }
+  // Sync enemies.
+  const aliveIds = new Set();
+  for (const e of state.enemies) {
+    aliveIds.add(e.id);
+    let m = enemyMeshes.get(e.id);
+    if (!m) {
+      m = makeEnemyMesh(e.kind);
+      scene.add(m);
+      enemyMeshes.set(e.id, m);
+    }
+    m.position.set(e.x, 0.4 + Math.sin(t * 3 + e.id.length) * 0.08, e.y);
+  }
+  for (const [id, m] of enemyMeshes) {
+    if (!aliveIds.has(id)) {
+      scene.remove(m);
+      enemyMeshes.delete(id);
+    }
+  }
+  // Sync projectiles.
+  const projIds = new Set();
+  for (const p of state.projectiles) {
+    projIds.add(p.id);
+    let m = projMeshes.get(p.id);
+    if (!m) {
+      m = new THREE.Mesh(
+        new THREE.SphereGeometry(0.12, 8, 6),
+        new THREE.MeshBasicMaterial({ color: PROJ_COLOR[p.type] || 0xffd700 })
+      );
+      scene.add(m);
+      projMeshes.set(p.id, m);
+    }
+    m.position.set(p.x, 0.9, p.y);
+  }
+  for (const [id, m] of projMeshes) {
+    if (!projIds.has(id)) {
+      scene.remove(m);
+      projMeshes.delete(id);
+    }
+  }
+  // Shrine trophy spins + bobs; portal shimmers.
+  if (trophyMesh) {
+    trophyMesh.rotation.y += dt * 0.8;
+    trophyMesh.position.y = trophyMesh.userData.baseY + Math.sin(t / 0.5) * 0.15;
+  }
+  portal.material.opacity = 0.4 + Math.sin(t * 2) * 0.15;
+  if (sparkLife > 0) {
+    sparkLife -= dt;
+    for (let i = 0; i < SPARK_N; i++) {
+      sparkPos[i * 3] += sparkVel[i * 3] * dt;
+      sparkPos[i * 3 + 1] += sparkVel[i * 3 + 1] * dt;
+      sparkPos[i * 3 + 2] += sparkVel[i * 3 + 2] * dt;
+      sparkVel[i * 3 + 1] -= 2 * dt;
+    }
+    sparkGeo.attributes.position.needsUpdate = true;
+    sparkMat.opacity = Math.max(0, sparkLife);
+    if (sparkLife <= 0) sparks.visible = false;
+  }
+  renderer.render(scene, camera);
+}
+
+window.__STAR_DEFENSE__ = {
+  get state() { return state; },
+  get hash() { return stateHash(state); },
+  world, saveKey: SAVE_KEY, assets: assetStatus,
+  audio: { get muted() { return audio.muted; }, get played() { return audio.played; } },
+  // QA helper: sim (x, y) -> screen pixels (for clicking build spots).
+  project(x, y) {
+    const v = new THREE.Vector3(x, 0, y).project(camera);
+    return { x: (v.x + 1) / 2 * window.innerWidth, y: (-v.y + 1) / 2 * window.innerHeight };
+  },
+};
+refreshHud();
+requestAnimationFrame(frame);
+
+window.addEventListener("resize", () => {
+  fitCamera();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>
