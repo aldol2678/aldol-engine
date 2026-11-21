@@ -99,6 +99,13 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
 .hud-panel p, .hud-panel div { font-size: var(--hud-body-size, 13px); margin: 2px 0; }
 .hud-panel .done { color: var(--hud-done, #9be49b); }
 .hud-panel .todo { color: var(--hud-todo, #e8f3e8); }
+/* Collapsible panel (2026-11-22 real-device QA): on a phone the full panel
+   (9 quests + NPC states + position + save) covered half the screen and hid
+   the player. Rows marked collapsible hide behind a toggle; on narrow
+   screens the panel starts collapsed. The toggle needs pointer events even
+   though the panel itself passes touches through to the canvas. */
+.hud-panel .hud-toggle { pointer-events: auto; display: inline-block; margin: 4px 0 2px; padding: 3px 10px; border: none; border-radius: 999px; background: rgba(255,255,255,.14); color: inherit; font: inherit; font-size: 12px; line-height: 1.4; cursor: pointer; }
+.hud-panel.collapsed .hud-collapsible { display: none; }
 .hpbar { height: 8px; background: #333; border-radius: 4px; overflow: hidden; margin: 4px 0; }
 .hpbar > div { height: 100%; background: #e05252; width: 100%; }
 #bark { position: absolute; left: 50%; bottom: var(--hud-bark-bottom, 92px); transform: translateX(-50%); background: var(--hud-bark-bg, #fffbe8); color: var(--hud-bark-fg, #222); border-radius: 12px; padding: 8px 14px; font-size: var(--hud-float-size, 14px); display: none; max-width: 80vw; box-shadow: 0 2px 10px rgba(0,0,0,.35); }
@@ -108,10 +115,13 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
 #help.center { left: 50%; transform: translateX(-50%); max-width: calc(100vw - 24px); text-align: center; }
 .hud-btn { position: absolute; border: none; border-radius: 50%; color: #fff; display: flex; align-items: center; justify-content: center; font-family: inherit; font-size: 15px; font-weight: bold; padding: 0; user-select: none; touch-action: none; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.4); }
 /* Narrow screens: the top-left panel and the top-right phase panel overlap
-   at full width — shrink both so the title stays readable. */
+   at full width — shrink both so the title stays readable. An expanded panel
+   is height-capped and scrollable (with pointer events so it can scroll);
+   collapsed it stays small and passes touches through to the canvas. */
 @media (max-width: 640px) {
   .hud-panel { max-width: 52vw; }
   .hud-panel.top-right { max-width: 40vw; }
+  .hud-panel:not(.collapsed) { max-height: 62vh; overflow-y: auto; pointer-events: auto; }
 }
 `;
 
@@ -159,7 +169,10 @@ export function installHudCss(themeName) {
 
 // Info panel (top-left by default, top-right with position: "right").
 // rows: string ids ("zone") or { id, tag = "p", className, html, text }.
-// The hp bar is a row too: { tag: "div", className: "hpbar", html: '<div id="hpfill"></div>' }.
+// A row with collapsible: true (quests, NPC states, position, save) goes
+// behind a toggle: on narrow screens the panel starts collapsed so the
+// game world stays visible. The hp bar is a row too:
+// { tag: "div", className: "hpbar", html: '<div id="hpfill"></div>' }.
 // Returns { el, slots } where slots maps row ids to their elements.
 export function createHudPanel({ id, title, rows = [], position = "left", style = {} }) {
   const el = document.createElement("div");
@@ -172,15 +185,36 @@ export function createHudPanel({ id, title, rows = [], position = "left", style 
     el.appendChild(h);
   }
   const slots = {};
-  for (const row of rows) {
+  const addRow = (parent, row) => {
     const spec = typeof row === "string" ? { id: row } : row;
     const node = document.createElement(spec.tag || "p");
     if (spec.id) node.id = spec.id;
     if (spec.className) node.className = spec.className;
     if (spec.html) node.innerHTML = spec.html;
     if (spec.text) node.textContent = spec.text;
-    el.appendChild(node);
+    parent.appendChild(node);
     if (spec.id) slots[spec.id] = node;
+  };
+  const isCollapsible = (row) => typeof row !== "string" && row.collapsible;
+  const alwaysRows = rows.filter((r) => !isCollapsible(r));
+  const collapsibleRows = rows.filter(isCollapsible);
+  for (const row of alwaysRows) addRow(el, row);
+  if (collapsibleRows.length > 0) {
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "hud-toggle";
+    if (id) toggle.id = `${id}-toggle`;
+    const setCollapsed = (collapsed) => {
+      el.classList.toggle("collapsed", collapsed);
+      toggle.textContent = collapsed ? "▶ 의뢰·상태" : "▼ 의뢰·상태";
+    };
+    toggle.addEventListener("click", () => setCollapsed(!el.classList.contains("collapsed")));
+    el.appendChild(toggle);
+    const container = document.createElement("div");
+    container.className = "hud-collapsible";
+    for (const row of collapsibleRows) addRow(container, row);
+    el.appendChild(container);
+    setCollapsed(window.matchMedia("(max-width: 640px)").matches);
   }
   document.body.appendChild(el);
   return { el, slots };

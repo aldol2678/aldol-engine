@@ -47,15 +47,16 @@ const world = worldToSim(manifest);
 // --- HUD (shared kit: src/render/hud.js) ---
 installHudCss("forest");
 const panel = createHudPanel({
+  id: "hud",
   title: "수풀리 M1 — 마을 + 숲 + 농장",
   rows: [
     "zone",
     { tag: "div", className: "hpbar", html: '<div id="hpfill"></div>' },
     "hp",
-    { id: "quests", tag: "div" },
-    "npc-state",
-    "pos",
-    "save-state",
+    { id: "quests", tag: "div", collapsible: true },
+    { id: "npc-state", collapsible: true },
+    { id: "pos", collapsible: true },
+    { id: "save-state", collapsible: true },
   ],
 });
 const bark = createBark();
@@ -65,13 +66,14 @@ createHelp("WASD/방향키 이동 · E 대화 · 스페이스바 공격 · 드�
 const BARKS = {
   patrol: ["오늘 날씨 참 좋지.", "마을은 평화로워야 해.", "길을 잃었나? 마을은 작아."],
   chase: ["어? 누구야, 거기!", "잠깐, 너 누구야?", "이쪽으로 와 봐."],
+  approach: ["어, 안녕!", "무슨 일 있어?", "얘기 좀 하자."],
   flee: ["살려줘! 도망가야 해!", "너무 무서워…", "저리 가!"],
   boar: ["꿀꿀!", "크르릉…", "꿀꿀꿀!"],
   guardian: ["크아아!", "숲을 더럽히지 마!", "돌아가라, 침입자야!"],
   hit: ["맞혔다!", "제대로 들어갔어!"],
   quest: ["고마워! 마을을 잘 부탁해.", "너라면 수풀을 지킬 수 있을 거야."],
 };
-const STATE_LABEL = { patrol: "순찰", chase: "추격", flee: "도망", defeated: "처치됨" };
+const STATE_LABEL = { patrol: "순찰", chase: "추격", approach: "다가옴", flee: "도망", defeated: "처치됨" };
 
 // --- sim: WASM with JS fallback (src/render/sim-loader.js) ---
 // The live rng is fork("bark"): the same stream feeds the sim steps AND the

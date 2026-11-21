@@ -71,10 +71,10 @@ const panel = createHudPanel({
   rows: [
     { id: "zone", tag: "div" },
     { id: "score", tag: "div" },
-    { id: "quests", tag: "div" },
-    { id: "npcs", tag: "div" },
-    { id: "pos", tag: "div" },
-    { id: "save-state", tag: "div" },
+    { id: "quests", tag: "div", collapsible: true },
+    { id: "npcs", tag: "div", collapsible: true },
+    { id: "pos", tag: "div", collapsible: true },
+    { id: "save-state", tag: "div", collapsible: true },
   ],
 });
 const phasePanel = createHudPanel({

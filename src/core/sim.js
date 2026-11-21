@@ -5,7 +5,9 @@
 // object, so headless runs stay deterministic and testable.
 //
 // NPC FSM transitions (per npc):
-//   patrol -> chase : distance(player) < sight
+//   patrol -> chase    : hostile only, distance(player) < sight
+//   patrol -> approach : talk NPCs, distance(player) < sight (stop at 1.2)
+//   chase/approach -> patrol: distance(player) > sight + 3
 //   chase  -> patrol: distance(player) > sight + 3
 //   any    -> flee  : 0 < npc.hp <= fleeHp (combat rule)
 //   any    -> defeated: npc.hp <= 0 (player attack)
@@ -223,8 +225,13 @@ export function step(state, input, rng, world = DEFAULT_WORLD) {
     } else if (npc.state === "flee" && dist > npc.sight + 3) {
       npc.state = "patrol";
     } else if (npc.state === "patrol" && dist < npc.sight) {
-      npc.state = "chase";
-    } else if (npc.state === "chase" && dist > npc.sight + 3) {
+      // Hostiles chase to contact; talk NPCs only walk up to talk range.
+      // (2026-11-22 real-device QA: with plain chase for everyone the HUD
+      // showed all five NPCs as "추격" at once and the player got mobbed.
+      // Talk NPCs must still come to the player — the talk-quest test
+      // relies on the villager closing in — so they approach and stop.)
+      npc.state = npc.interaction === "hostile" ? "chase" : "approach";
+    } else if ((npc.state === "chase" || npc.state === "approach") && dist > npc.sight + 3) {
       npc.state = "patrol";
     }
 
@@ -239,6 +246,10 @@ export function step(state, input, rng, world = DEFAULT_WORLD) {
       }
     } else if (npc.state === "chase") {
       moveNpc(npc, next.player.x, next.player.y, NPC_SPEED * 1.15, world);
+    } else if (npc.state === "approach") {
+      // Talk NPCs walk up to the player but stop at talk range (1.2 is
+      // inside the 1.5 interact range, so the talk quest still completes).
+      if (dist > 1.2) moveNpc(npc, next.player.x, next.player.y, NPC_SPEED * 1.15, world);
     } else {
       // flee: seek away from the player.
       const away = { x: npc.x + (npc.x - next.player.x), y: npc.y + (npc.y - next.player.y) };

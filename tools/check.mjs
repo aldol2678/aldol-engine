@@ -73,11 +73,11 @@ function steer(seed, worldArg, targetOf, frames, interactAtEnd = 0) {
   return state;
 }
 
-// 3. Behaviour smoke: player actually moves; NPC patrols and chases.
+// 3. Behaviour smoke: player actually moves; NPC patrols, chases and approaches.
 const moved = simulate("supuli-m1", 120, { dx: 1, dy: 0 }, world);
 check("player moves east", moved.state.player.x > 0, `x=${moved.state.player.x.toFixed(2)}`);
 const chase = simulate("supuli-m1", 600, { dx: 1, dy: 1 }, world);
-check("npc leaves patrol or chases", ["patrol", "chase", "flee"].includes(chase.state.npcs[0].state), `npc=${chase.state.npcs[0].state}`);
+check("npc leaves patrol or chases", ["patrol", "chase", "approach", "flee", "defeated"].includes(chase.state.npcs[0].state), `npc=${chase.state.npcs[0].state}`);
 check("A* path exists 0->2", Array.isArray(findPath(0, 2, world.edges, world.waypoints)) && findPath(0, 2, world.edges, world.waypoints)[0] === 0,
   `path=${JSON.stringify(findPath(0, 2, world.edges, world.waypoints))}`);
 

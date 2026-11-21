@@ -75,8 +75,8 @@ const panel = createHudPanel({
     { id: "selected", tag: "div" },
     { id: "shrine", tag: "div" },
     { tag: "div", className: "hpbar", html: '<div id="hpfill"></div>' },
-    { id: "quests", tag: "div" },
-    { id: "save-state", tag: "div" },
+    { id: "quests", tag: "div", collapsible: true },
+    { id: "save-state", tag: "div", collapsible: true },
   ],
 });
 const phasePanel = createHudPanel({

@@ -45,7 +45,7 @@ docs/          handoff.md (핸드오프 형식)
 3. 고정 스텝 1/60초. AI 틱은 10–20Hz, 그 사이는 스티어링만 보간한다.
 4. 같은 `(seed, frames, inputs, world)`는 항상 같은 상태 해시를 낸다. 다르면 버그다.
 
-현재 해시: 수풀리 `d7b601e9` (seed `supuli-m1`, 600프레임, `{dx:1, dy:0}`), 별낚시 `7eb7f2df`, 별수호 디펜스 `0d316768` (seed `star-defense-m3`, 600프레임, `[{startWave:true}]`).
+현재 해시: 수풀리 `754a144e` (seed `supuli-m1`, 600프레임, `{dx:1, dy:0}`), 별낚시 `7eb7f2df`, 별수호 디펜스 `0d316768` (seed `star-defense-m3`, 600프레임, `[{startWave:true}]`).
 
 ## 검사
 
