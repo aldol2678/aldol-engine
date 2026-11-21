@@ -33,7 +33,7 @@
     transition: transform .15s ease, border-color .15s ease;
   }
   .card:hover { transform: translateY(-3px); border-color: #4a5aa8; }
-  .card img { display: block; width: 100%; aspect-ratio: 1200 / 630; object-fit: cover; }
+  .card img { display: block; width: 100%; aspect-ratio: 1200 / 630; object-fit: cover; -webkit-user-drag: none; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
   .card .body { padding: 16px 18px 18px; }
   .card .tag { font-size: 12px; font-weight: 700; letter-spacing: .08em; color: #8affc1; }
   .card h2 { margin: 6px 0 8px; font-size: 20px; }
@@ -52,7 +52,7 @@
   </header>
   <div class="grid">
     <a class="card" href="games/supuli/">
-      <img src="games/supuli/og-image.png" alt="수풀리 플레이 화면">
+      <img src="games/supuli/og-image.png" alt="수풀리 플레이 화면" draggable="false">
       <div class="body">
         <div class="tag">M1 · 마을 + 숲 + 농장</div>
         <h2>수풀리</h2>
@@ -61,7 +61,7 @@
       </div>
     </a>
     <a class="card" href="games/star-fishing/">
-      <img src="games/star-fishing/og-image.png" alt="별낚시 플레이 화면">
+      <img src="games/star-fishing/og-image.png" alt="별낚시 플레이 화면" draggable="false">
       <div class="body">
         <div class="tag">M2 · 호수 낚시</div>
         <h2>별낚시</h2>
@@ -70,7 +70,7 @@
       </div>
     </a>
     <a class="card" href="games/star-defense/">
-      <img src="games/star-defense/og-image.png" alt="별수호 디펜스 플레이 화면">
+      <img src="games/star-defense/og-image.png" alt="별수호 디펜스 플레이 화면" draggable="false">
       <div class="body">
         <div class="tag">M3 · 타워 디펜스</div>
         <h2>별수호 디펜스</h2>
@@ -84,5 +84,12 @@
     Aldol Studio — 게임은 저장됩니다. 진행 중인 웨이브(별수호 디펜스)는 저장되지 않습니다.
   </footer>
 </div>
+<script>
+// 모바일·PC 공통 기본값: 우클릭/롱프레스 메뉴와 이미지·텍스트 드래그를 막는다.
+// contextmenu만 막을 뿐이라 클릭·터치 입력은 그대로 동작한다.
+document.addEventListener("contextmenu", (e) => e.preventDefault());
+document.addEventListener("dragstart", (e) => e.preventDefault());
+document.querySelectorAll("img").forEach((img) => { img.draggable = false; });
+</script>
 </body>
 </html>

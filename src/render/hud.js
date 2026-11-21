@@ -90,6 +90,9 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: 
 #app { position: fixed; inset: 0; }
 #app canvas { display: block; touch-action: none; }
 .hud-panel, #bark, #prompt, #help { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+/* 이미지 드래그·선택도 막는다. 입력란만 예외로 선택을 허용한다 (전역 표준 2026-11-21). */
+img { -webkit-user-drag: none; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+input, textarea, [contenteditable] { -webkit-user-select: text; user-select: text; }
 .hud-panel { position: absolute; left: 12px; top: 12px; max-width: 320px; background: var(--hud-panel-bg, rgba(16, 26, 18, 0.82)); color: var(--hud-panel-fg, #e8f3e8); border-radius: 10px; padding: var(--hud-panel-padding, 10px 12px); line-height: 1.5; pointer-events: none; }
 .hud-panel.top-right { left: auto; right: 12px; }
 .hud-panel h1 { font-size: var(--hud-title-size, 15px); margin: 0 0 4px; }
@@ -113,11 +116,24 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: 
 `;
 
 let cssInstalled = false;
+let noSelectListenersInstalled = false;
+
+// 우클릭 메뉴(PC)·롱프레스 메뉴(모바일)와 HTML5 드래그 시작을 막는다.
+// contextmenu/dragstart만 막을 뿐이라 우클릭 mousedown·pointerdown은 그대로
+// 들어오니, 우클릭을 게임 조작으로 쓰는 경우(한풀이: 우클릭 이동)는 그대로 동작한다.
+function installNoSelectListeners() {
+  if (noSelectListenersInstalled) return;
+  noSelectListenersInstalled = true;
+  document.addEventListener("contextmenu", (e) => e.preventDefault());
+  document.addEventListener("dragstart", (e) => e.preventDefault());
+  document.querySelectorAll("img").forEach((img) => { img.draggable = false; });
+}
 
 // Inject the shared HUD stylesheet once and apply the theme's CSS variables.
 export function installHudCss(themeName) {
   if (cssInstalled) return;
   cssInstalled = true;
+  installNoSelectListeners();
   const theme = THEMES[themeName] || THEMES.forest;
   const style = document.createElement("style");
   style.id = "hud-kit-css";
