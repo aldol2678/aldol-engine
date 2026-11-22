@@ -12,13 +12,16 @@ function fnv1a(str) {
 
 function mulberry32(seed) {
   let a = seed >>> 0;
-  return function next() {
+  function next() {
     a |= 0;
     a = (a + 0x6d2b79f5) | 0;
     let t = Math.imul(a ^ (a >>> 15), 1 | a);
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+  }
+  next.getState = () => a >>> 0;
+  next.setState = (value) => { a = value | 0; };
+  return next;
 }
 
 export class Rng {
@@ -48,5 +51,17 @@ export class Rng {
   // Named sub-stream, e.g. fork('ai:patrol'). Deterministic per (seed, name).
   fork(name) {
     return new Rng(`${this.seedString}::${name}`);
+  }
+  // Versioned, JSON-serializable checkpoint. Existing sequences stay unchanged.
+  snapshot() {
+    return { version: 1, seed: this.seedString, state: this.next.getState() };
+  }
+  // Reject corrupt / mismatched snapshots before touching the stream.
+  restore(snapshot) {
+    if (!snapshot || snapshot.version !== 1 || snapshot.seed !== this.seedString ||
+        !Number.isInteger(snapshot.state) || snapshot.state < 0 || snapshot.state > 0xffffffff) {
+      throw new Error("invalid or incompatible RNG snapshot");
+    }
+    this.next.setState(snapshot.state);
   }
 }
