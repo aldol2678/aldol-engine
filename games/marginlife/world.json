@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "worldforge/0.1",
+  "project": { "id": "marginlife", "name": "여백 | MARGINLIFE", "template": "marginlife-p1" },
+  "world": { "id": "marginlife-village", "name": "여백 마을", "handedness": "right", "upAxis": "Y", "units": "meter" },
+  "assets": [
+    { "id": "merchant", "type": "model", "uri": "builtin:merchant" },
+    { "id": "hero", "type": "model", "uri": "builtin:hero" }
+  ],
+  "zones": [
+    { "id": "village", "name": "마을", "type": "zone.village", "geometry": { "type": "polygon", "space": "local", "points": [[-5,-5],[10,-5],[10,10],[-5,10]] } },
+    { "id": "wilderness", "name": "마을 외곽", "type": "zone.forest", "geometry": { "type": "polygon", "space": "local", "points": [[10,-5],[25,-5],[25,10],[10,10]] } }
+  ],
+  "places": [
+    { "id": "spawn", "name": "마을 광장", "zoneId": "village", "type": "place.spawn", "position": [0,0,0] },
+    { "id": "shop", "name": "물약 가게", "zoneId": "village", "type": "place.shop", "position": [2,0,2] },
+    { "id": "forest", "name": "잔가지 숲", "zoneId": "wilderness", "type": "place.forest", "position": [15,0,1] },
+    { "id": "ruins", "name": "석조 유적", "zoneId": "wilderness", "type": "place.ruins", "position": [21,0,6] }
+  ],
+  "paths": [
+    { "id": "road-shop-forest", "name": "숲길", "type": "path.walk", "from": "shop", "to": "forest", "enabled": true, "oneWay": false, "modes": ["walk","npc"], "points": [[2,0,2],[15,0,1]], "widthMeters": 2 },
+    { "id": "road-forest-ruins", "name": "유적길", "type": "path.walk", "from": "forest", "to": "ruins", "enabled": true, "oneWay": false, "modes": ["walk","npc"], "points": [[15,0,1],[21,0,6]], "widthMeters": 2 }
+  ],
+  "entities": [
+    { "id": "ent-shopkeeper", "name": "약초상인", "assetId": "merchant", "type": "entity.npc", "enabled": true, "transform": { "position": [2,0,2], "rotation": [0,0,0,1], "scale": [1,1,1] } },
+    { "id": "ent-arlen", "name": "아렌", "assetId": "hero", "type": "entity.npc", "enabled": true, "transform": { "position": [1,0,0], "rotation": [0,0,0,1], "scale": [1,1,1] } },
+    { "id": "ent-serin", "name": "세린", "assetId": "hero", "type": "entity.npc", "enabled": true, "transform": { "position": [0,0,1], "rotation": [0,0,0,1], "scale": [1,1,1] } },
+    { "id": "ent-belen", "name": "벨렌", "assetId": "hero", "type": "entity.npc", "enabled": true, "transform": { "position": [-1,0,0], "rotation": [0,0,0,1], "scale": [1,1,1] } }
+  ],
+  "npcs": [
+    { "id": "merchant-1", "name": "약초상인", "entityId": "ent-shopkeeper", "homePlaceId": "shop", "profile": { "role": "merchant", "attributes": { "cash": 75, "stock": 12, "unitPrice": 12, "creditLimit": 24 } }, "schedule": [{ "start": "08:00", "end": "21:00", "action": "shop", "target": "shop" }] },
+    { "id": "hero-arlen", "name": "아렌", "entityId": "ent-arlen", "homePlaceId": "spawn", "profile": { "role": "hero", "attributes": { "cash": 3, "hp": 65, "skill": 64 }, "goal": "glory", "riskTolerance": 0.8 }, "schedule": [{ "start": "08:00", "end": "20:00", "action": "adventure", "target": "ruins" }] },
+    { "id": "hero-serin", "name": "세린", "entityId": "ent-serin", "homePlaceId": "spawn", "profile": { "role": "hero", "attributes": { "cash": 40, "hp": 80, "skill": 48 }, "goal": "protect", "riskTolerance": 0.3 }, "schedule": [{ "start": "08:00", "end": "20:00", "action": "adventure", "target": "forest" }] },
+    { "id": "hero-belen", "name": "벨렌", "entityId": "ent-belen", "homePlaceId": "spawn", "profile": { "role": "hero", "attributes": { "cash": 29, "hp": 74, "skill": 58 }, "goal": "fortune", "riskTolerance": 0.6 }, "schedule": [{ "start": "08:00", "end": "20:00", "action": "adventure", "target": "ruins" }] }
+  ],
+  "quests": [], "events": [],
+  "rules": [
+    { "id": "marginlife-p1", "type": "game.marginlife", "enabled": true, "config": { "days": 7, "phases": ["morning", "afternoon", "evening"], "upkeepPerDay": 2, "potionHeal": 25, "forageIncome": 5, "forestReward": 13, "ruinsReward": 24 } }
+  ]
+}

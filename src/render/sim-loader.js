@@ -71,8 +71,30 @@ function createJsSim(kind, seed, rngSeed, world, js) {
     hash() {
       return stateHash(state);
     },
+    // Legacy partial state restore: does NOT restore the RNG stream.
     loadState(next) {
       state = structuredClone(next);
+    },
+    // Explicit atomic game-state + RNG checkpoint for new opt-in saves.
+    saveSnapshot() {
+      return {
+        format: "aldol.sim.snapshot.v1", kind, seed, rngSeed,
+        state: structuredClone(state), rng: rng.snapshot(),
+      };
+    },
+    loadSnapshot(snapshot) {
+      if (!snapshot || snapshot.format !== "aldol.sim.snapshot.v1" ||
+          snapshot.kind !== kind || snapshot.seed !== seed || snapshot.rngSeed !== rngSeed ||
+          !snapshot.state || typeof snapshot.state !== "object" || Array.isArray(snapshot.state)) {
+        throw new Error("invalid or incompatible simulation snapshot");
+      }
+      const nextState = structuredClone(snapshot.state);
+      // Validate the RNG checkpoint before modifying either live object.
+      const validator = new Rng(rngSeed);
+      validator.restore(snapshot.rng);
+      rng.restore(snapshot.rng);
+      state = nextState;
+      return state;
     },
     rngNext() {
       return rng.next();
@@ -111,6 +133,13 @@ function createWasmSim(mod, kind, seed, rngSeed, world) {
         state = JSON.parse(wasmSim.state());
       }
     },
+    // Rust/WASM does not yet export a restorable RNG state. Do not fake parity.
+    saveSnapshot() {
+      throw new Error("WASM RNG snapshots unsupported; use createSim({ preferJs: true })");
+    },
+    loadSnapshot() {
+      throw new Error("WASM RNG snapshots unsupported; use createSim({ preferJs: true })");
+    },
     rngNext() {
       return wasmSim.rng_next();
     },
@@ -120,13 +149,17 @@ function createWasmSim(mod, kind, seed, rngSeed, world) {
   };
 }
 
-export async function createSim({ kind, seed, rngSeed, world, js }) {
-  const mod = await tryLoadWasm();
-  if (mod) {
-    try {
-      return createWasmSim(mod, kind, seed, rngSeed, world);
-    } catch {
-      // WASM construction failed (bad world JSON, etc.) — fall through to JS.
+// preferJs is opt-in for games requiring deterministic save+restore today.
+// Existing games retain their original WASM-first behavior by default.
+export async function createSim({ kind, seed, rngSeed, world, js, preferJs = false }) {
+  if (!preferJs) {
+    const mod = await tryLoadWasm();
+    if (mod) {
+      try {
+        return createWasmSim(mod, kind, seed, rngSeed, world);
+      } catch {
+        // WASM construction failed (bad world JSON, etc.) — fall through to JS.
+      }
     }
   }
   return createJsSim(kind, seed, rngSeed, world, js);
