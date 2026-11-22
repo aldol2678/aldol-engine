@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#151e21">
+  <meta name="description" content="여백 MARGINLIFE: 용사의 이야기 곁에서 살아가는 상인의 7일. 자율 용사 시뮬레이션 플레이 프로토타입.">
+  <title>여백 | MARGINLIFE · 상인의 일주일</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div id="app" class="app">
+    <header class="masthead">
+      <div class="brand"><div class="brand-symbol" aria-hidden="true">✦</div><div><div class="brand-name">여백 <small>MARGINLIFE</small></div><p>누군가의 전설 속에서, 나의 하루를 산다.</p></div></div>
+      <div class="head-actions"><span class="version-tag">첫 플레이 실험 · P2</span><button id="btn-save" class="utility" title="현재 상태 저장">저장</button><button id="btn-load" class="utility" title="저장된 상태 불러오기">불러오기</button><button id="btn-reset" class="utility" title="새로운 7일 시작">처음부터</button></div>
+    </header>
+    <main class="main-grid">
+      <section class="world-card" aria-label="픽셀 마을">
+        <div class="world-heading"><div class="world-place"><span class="small-star">✧</span> 여백 마을 <span class="muted">| 마을 중심가</span></div><div id="world-clock" class="world-clock">1일 차 · 아침</div></div>
+        <div class="canvas-container" id="canvas-container">
+          <canvas id="game-canvas" width="600" height="360" tabindex="0" aria-label="NPC 상인이 있는 마을 지도. WASD 또는 화살표 키로 움직입니다."></canvas>
+          <div id="speech" class="speech">세상의 주인공은 따로 있다. 나는 오늘도 가게 문을 연다.</div>
+          <div class="canvas-label"><span class="dot"></span> <span id="current-location">물약 가게 앞</span></div>
+          <div class="move-pad" aria-label="이동 조작">
+            <button class="pad-up" data-move="up" aria-label="위쪽으로 이동">▲</button>
+            <button class="pad-left" data-move="left" aria-label="왼쪽으로 이동">◀</button>
+            <button class="pad-down" data-move="down" aria-label="아래쪽으로 이동">▼</button>
+            <button class="pad-right" data-move="right" aria-label="오른쪽으로 이동">▶</button>
+          </div>
+        </div>
+        <div class="footline"><span>⌨ WASD / 방향키 · 지도 터치 이동 · 가게 앞에서 영업</span><span id="status-bar">마을이 조용히 하루를 시작합니다.</span></div>
+        <div class="world-bottom"><div><span class="eyebrow">작은 선택, 긴 그림자</span><h2>용사는 알아서 모험한다.</h2><p>용사들의 길을 직접 정할 수는 없어요. 하지만 물약 한 병은 그 길을 바꿀 수 있죠.</p></div><div class="legend"><span><i style="background:#efca8a"></i> 상인</span><span><i style="background:#91c6de"></i> 용사</span><span><i style="background:#71a582"></i> 마을</span></div></div>
+      </section>
+      <aside class="sidebar" aria-label="상점과 용사 상태">
+        <div class="day-card"><div class="day-overline">당신의 일주일</div><div class="day-number"><strong id="day-index">01</strong><span> / 07 DAYS</span></div><div id="phase-list" class="phase-row"><span class="active">아침 영업</span><span>오후 계획</span><span>저녁 모험</span></div></div>
+        <section class="decision-card" id="decision-card"><div class="section-caption">오늘의 가게</div><h2 id="decision-title">물약 한 병, 어떤 선택을 할까?</h2><p id="decision-desc">주머니가 가벼운 용사가 문 앞에 서 있습니다. 영웅에게도 물약값은 현실입니다.</p><div class="choice-row" id="choice-row"><button id="btn-deny" class="choice selected" aria-pressed="true">외상 거절</button><button id="btn-offer" class="choice" aria-pressed="false">외상 허용</button></div><button id="btn-advance" class="primary">오늘 영업 시작 <span aria-hidden="true">↗</span></button><p class="tip" id="decision-tip">가게 앞에서 선택할 수 있어요. 허용할 경우 자금이 부족한 용사에게 외상 판매가 이루어집니다.</p></section>
+        <section class="stats-card"><div class="section-caption">내 가게의 사정</div><div class="stats-grid"><div><label>보유 골드</label><strong id="metric-cash">75 <small>G</small></strong></div><div><label>남은 물약</label><strong id="metric-stock">12 <small>병</small></strong></div><div><label>받을 외상</label><strong id="metric-credit">0 <small>G</small></strong></div><div><label>평판</label><strong id="metric-rep">0</strong></div></div></section>
+        <section class="heroes-card"><div class="section-title-row"><div><div class="section-caption">당신을 스쳐 가는 사람들</div><h3>용사들의 오늘</h3></div><span class="count-mark">03</span></div><div id="heroes-list" class="heroes-list"></div></section>
+        <section class="log-card"><div class="section-title-row"><div><div class="section-caption">마을에 남은 기록</div><h3>오늘의 소식</h3></div><button id="btn-full-log" class="tiny-btn">전체 보기</button></div><ul id="events-list" class="event-list" aria-live="polite"></ul></section>
+      </aside>
+    </main>
+    <footer class="bottom-note">MARGINLIFE · 세계의 움직임은 실제 규칙 기반 P1 시뮬레이션과 연결됩니다. 인물 위치 표현과 상인 이동은 이 첫 화면을 위한 시각적 프로토타입입니다.</footer>
+  </div>
+  <div id="toast" role="status" aria-live="polite" class="toast"></div>
+  <dialog id="dialog-log" class="overlay"><div class="dialog-top"><div><span class="eyebrow">사건 일지</span><h2>기록되지 않은 이야기</h2></div><button id="close-log" class="utility">닫기</button></div><div id="full-log" class="full-log"></div></dialog>
+  <dialog id="dialog-ending" class="overlay ending-dialog"><div class="dialog-top"><div><span class="eyebrow">일곱 번째 밤</span><h2>당신의 여백</h2></div><button id="close-ending" class="utility">닫기</button></div><div id="ending-content"></div><button id="btn-ending-restart" class="primary">또 다른 일주일 시작하기 ↗</button></dialog>
+  <script type="module" src="./ui.js"></script>
+</body>
+</html>
