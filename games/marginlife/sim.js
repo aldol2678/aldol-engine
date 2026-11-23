@@ -3,6 +3,7 @@
 // All world rules come from games/marginlife/world.json. No wall clock or UI APIs.
 import { Rng } from "../../src/core/rng.js";
 import { stateHash } from "../../src/core/state-hash.js";
+import { createLifeState, advanceLife } from "./survival.js";
 
 export const GAME_KIND = "marginlife";
 export const DEFAULT_SEED = "marginlife-demo-01";
@@ -44,7 +45,7 @@ export function createInitialState(seed, world) {
       sales: 0, creditSales: 0, repayments: 0,
     }, heroes, events: [], nextEventId: 1,
     ledger: { initialCash: cash, outsideIncome: 0, outsideCosts: 0, potionsConsumed: 0 },
-    ending: null, expectedDays: cfg.days,
+    ending: null, expectedDays: cfg.days, life: createLifeState(world),
   };
 }
 function settleDebt(state, hero) {
@@ -158,6 +159,7 @@ export function step(state, input = {}, rng, world) {
   if (phase === "morning") morning(next, input, cfg);
   else if (phase === "afternoon") afternoon(next);
   else evening(next, rng, cfg);
+  advanceLife(next, world, phase, (type, actor, detail) => event(next, type, actor, detail));
   next.tick++;
   if (next.tick === cfg.days * PHASES.length) {
     next.finished = true;
