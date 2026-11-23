@@ -26,3 +26,12 @@ This branch is stacked on `fix/marginlife-rng-snapshot-20261122` (PR #1). It mus
 - Persistence: `marginlife.p2.demo.save.v1` stores the opt-in JS `saveSnapshot()` (including RNG position) and UI-only avatar coordinates. New saves do not overwrite Supuli/Star Fishing/Star Defense.
 - **Scope boundary:** the rendered character movement and hero screen positions are visual UI-only, not a WorldCore navmesh or persistent NPC location model. Time advances only on button press (21 turns/7 days). One classic 2D presentation only; HD pixel/3D have not yet been connected.
 - `npm run check:marginlife:ui` runs 11 Node/mock-DOM smoke checks. Real Chromium and Android visual QA remain pending because local Chromium was blocked by administrator URL policies during this task. Do not claim browser PASS or deploy readiness from these checks.
+
+## P3 NPC survival life loop (draft)
+
+- `survival.js` now advances one NPC life action for each of the 4 NPCs per P1 phase: move, eat, rest, work. Life state is included in existing game snapshots.
+- NPC movement uses one WorldForge graph edge per phase and a deterministic sorted breadth-first route. A new spawn-shop path connects NPC home and workplace. No silent teleport.
+- Hunger +13 and fatigue +10 per phase (0..100); initial food 6, eating reduces hunger by 55, resting at home reduces fatigue by 42. Hero wages are 6G and accounted as external income; merchant work pays no external wage.
+- IMPORTANT limitation: P1 potion trades and adventures still use the legacy abstract phase rules and are not yet spatially gated. P2 hero sprites are illustrative and do not yet reflect physical life-state positions.
+- QA: `node tools/check-marginlife-survival.mjs` 13 checks plus 32 multi-seed scenarios; P1 11/11 and P2 mock DOM 11/11 local. `tools/build-marginlife-standalone.py` now embeds survival code.
+- Stacked development only. PR #1/#2/#3 remain prerequisites; no main merge, deployment or live-save migration.
