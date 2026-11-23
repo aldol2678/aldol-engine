@@ -15,6 +15,7 @@ rng=(root/'src'/'core'/'rng.js').read_text('utf-8')
 hash_js=(root/'src'/'core'/'state-hash.js').read_text('utf-8')
 loader=(root/'src'/'render'/'sim-loader.js').read_text('utf-8')
 sim=(game/'sim.js').read_text('utf-8')
+life=(game/'survival.js').read_text('utf-8')
 ui=(game/'ui.js').read_text('utf-8')
 
 def one(s,old,new='',where='unknown'):
@@ -27,6 +28,8 @@ hash_js=hash_js.replace('export function stateHash','function stateHash')
 loader=one(loader,'import { Rng } from "../core/rng.js";\n','', 'loader')
 loader=one(loader,'import { stateHash } from "../core/state-hash.js";\n','', 'loader')
 loader=one(loader,'export async function createSim','async function createSim','loader')
+life=life.replace('export function ','function ')
+sim=one(sim,'import { createLifeState, advanceLife } from "./survival.js";\n','', 'sim life import')
 sim=one(sim,'import { Rng } from "../../src/core/rng.js";\n','', 'sim')
 sim=one(sim,'import { stateHash } from "../../src/core/state-hash.js";\n','', 'sim')
 sim=sim.replace('export const ','const ').replace('export function ','function ')
@@ -36,7 +39,7 @@ ui=one(ui,'''const WORLD = await fetch("./world.json").then(r => {
   if (!r.ok) throw new Error(`world.json could not load (${r.status})`);
   return r.json();
 });''', 'const WORLD = '+json.dumps(world,ensure_ascii=False,separators=(',',':'))+';', 'world embed')
-source='\n\n'.join([rng,hash_js,loader,sim,ui])
+source='\n\n'.join([rng,hash_js,loader,life,sim,ui])
 if '</script' in source.lower():raise ValueError('script-breaking tag found')
 html=one(html,'<link rel="stylesheet" href="./style.css">','<style>\n'+style+'\n</style>','css inline')
 html=one(html,'<script type="module" src="./ui.js"></script>','<script type="module">\n'+source+'\n</script>','js inline')
