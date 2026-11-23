@@ -35,3 +35,5 @@ This branch is stacked on `fix/marginlife-rng-snapshot-20261122` (PR #1). It mus
 - IMPORTANT limitation: P1 potion trades and adventures still use the legacy abstract phase rules and are not yet spatially gated. P2 hero sprites are illustrative and do not yet reflect physical life-state positions.
 - QA: `node tools/check-marginlife-survival.mjs` 13 checks plus 32 multi-seed scenarios; P1 11/11 and P2 mock DOM 11/11 local. `tools/build-marginlife-standalone.py` now embeds survival code.
 - Stacked development only. PR #1/#2/#3 remain prerequisites; no main merge, deployment or live-save migration.
+
+- Legacy P2 saves lacking life records initialize survival on the next simulation phase without modifying the old snapshot; earlier life history cannot be reconstructed.
