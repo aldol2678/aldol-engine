@@ -17,6 +17,7 @@
     { "id": "ruins", "name": "석조 유적", "zoneId": "wilderness", "type": "place.ruins", "position": [21,0,6] }
   ],
   "paths": [
+    { "id": "road-spawn-shop", "name": "시장 길", "type": "path.walk", "from": "spawn", "to": "shop", "enabled": true, "oneWay": false, "modes": ["walk","npc"], "points": [[0,0,0],[2,0,2]], "widthMeters": 2 },
     { "id": "road-shop-forest", "name": "숲길", "type": "path.walk", "from": "shop", "to": "forest", "enabled": true, "oneWay": false, "modes": ["walk","npc"], "points": [[2,0,2],[15,0,1]], "widthMeters": 2 },
     { "id": "road-forest-ruins", "name": "유적길", "type": "path.walk", "from": "forest", "to": "ruins", "enabled": true, "oneWay": false, "modes": ["walk","npc"], "points": [[15,0,1],[21,0,6]], "widthMeters": 2 }
   ],
