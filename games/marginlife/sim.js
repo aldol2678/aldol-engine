@@ -155,6 +155,8 @@ export function step(state, input = {}, rng, world) {
   if (state.worldId !== world.world.id || state.expectedDays !== cfg.days) throw new Error("world mismatch");
   if (input.creditPolicy != null && !["offer", "deny"].includes(input.creditPolicy)) throw new Error("invalid merchant credit policy");
   const next = structuredClone(state);
+  // Older P2 saves predate life records; initialize on the next phase without altering the old save.
+  if (!next.life) next.life = createLifeState(world);
   const phase = PHASES[next.tick % PHASES.length];
   if (phase === "morning") morning(next, input, cfg);
   else if (phase === "afternoon") afternoon(next);
