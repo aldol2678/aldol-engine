@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createSim } from '../src/render/sim-loader.js';
+import { Rng } from '../src/core/rng.js';
 import { createInitialState, step, simulate, GAME_KIND } from '../games/marginlife/sim.js';
 import { nextHop, createLifeState, advanceLife } from '../games/marginlife/survival.js';
 const world = JSON.parse(readFileSync(new URL('../games/marginlife/world.json', import.meta.url), 'utf8'));
@@ -108,6 +109,13 @@ check('21-tick currency and hunger/food bounds across 32 scenarios',()=>{
       assert.ok(life.moves>=0&&life.workTicks>=0&&life.restTicks>=0);
     }
   }
+});
+check('Pre-P3 P2 state upgrades survival records without mutating old save',()=>{
+  const previous=make();delete previous.life;
+  const progressed=step(previous,{creditPolicy:'deny'},new Rng(seed+'::heroes'),world);
+  assert.equal(previous.life,undefined);
+  assert.equal(progressed.life.version,1);
+  assert.equal(progressed.tick,1);
 });
 const snapTest=async()=>{
   const opts={kind:GAME_KIND,seed,rngSeed:seed+'::heroes',world,js:{createInitialState,step},preferJs:true};
