@@ -126,10 +126,11 @@ async function gameTrial(browser,engine,mode,variant,trace,blockWrites,audioMode
     row.intervalObserved=mode!=="interval"||row.oldEvents.some(e=>e.kind==="interval-fire"&&e.at<=row.before.at);
     row.restored=same(row.before.player,row.after.player)&&same(row.before.player,row.after.save?.player)&&shape(row.after.save);
     row.blockedWriteObserved=row.oldEvents.some(e=>e.kind==="save-write-blocked");
-    row.separatedVerdicts=judgeSave(row);
+    collectSources(row);
+    row.separatedVerdicts=judgeSave({...row,consoleEvidence:[...row.consoleEvidence,...row.pageErrors]});
     row.result=row.separatedVerdicts.release==="PASS"?"PASS":"FAIL";
   }catch(e){row.error=String(e);row.separatedVerdicts=judgeSave(row);}
-  finally{if(ctx)await ctx.close();collectSources(row);report.results.push(row);console.log("NEXT07_SAVE",JSON.stringify({engine,mode,variant,trace,blockWrites,audioMode,result:row.result,verdicts:row.separatedVerdicts,restored:row.restored,blockedWriteObserved:row.blockedWriteObserved,console:row.errorSources,audio:row.directAudioRejections,error:row.error}));}
+  finally{stage="teardown";if(ctx)await ctx.close();collectSources(row);report.results.push(row);console.log("NEXT07_SAVE",JSON.stringify({engine,mode,variant,trace,blockWrites,audioMode,result:row.result,verdicts:row.separatedVerdicts,restored:row.restored,blockedWriteObserved:row.blockedWriteObserved,console:row.errorSources,audio:row.directAudioRejections,error:row.error}));}
 }
 async function blankTrial(browser,mode,trace,explicitError=false){
   const row={engine:"firefox",mode,trace,explicitError,consoleEvidence:[],traceConsole:[],events:[]};
@@ -169,7 +170,8 @@ try{
   const blocked=report.results.filter(r=>r.variant==="storage-denied");
   report.summary={candidateFunctionalPass:candidates.filter(r=>r.separatedVerdicts?.functional==="PASS").length,candidateCount:candidates.length,blockedDetected:blocked.filter(r=>r.blockedWriteObserved&&r.separatedVerdicts?.functional==="FAIL"&&!r.after?.save).length,blockedCount:blocked.length,unattributed:report.results.flatMap(r=>r.errorSources||[]).filter(e=>e.source==="UNATTRIBUTED").length,explicitErrorDetected:report.controls.some(r=>r.explicitError&&r.consoleEvidence.some(e=>e.message.includes("NEXT07_EXPLICIT_PAGE_ERROR"))),sourceControlsComplete:report.controls.length===5&&report.controls.every(r=>r.completed),sourceVariantsComplete:report.results.length===14&&report.results.filter(r=>["uninstrumented","resume-catch-control"].includes(r.variant)).every(r=>r.separatedVerdicts?.functional==="PASS")};
   report.diagnosticPass=report.summary.candidateFunctionalPass===8&&report.summary.candidateCount===8&&report.summary.blockedDetected===2&&report.summary.blockedCount===2&&report.summary.explicitErrorDetected&&report.summary.sourceControlsComplete&&report.summary.sourceVariantsComplete;
-  report.release=report.diagnosticPass&&report.results.filter(r=>r.variant==="candidate").every(r=>r.result==="PASS")?"PASS":"HOLD";
+    report.sourceFindings=report.results.filter(r=>r.engine==="firefox").map(r=>({variant:r.variant,mode:r.mode,console:r.errorSources,audioRejections:r.directAudioRejections,pageErrors:r.pageErrors}));
+  report.release=report.diagnosticPass&&report.results.filter(r=>["candidate","uninstrumented"].includes(r.variant)).every(r=>r.result==="PASS"&&!r.errorSources.some(e=>e.stage!=="teardown")&&!r.pageErrors.length)?"PASS":"HOLD";
   fs.writeFileSync(path.join(OUT,"source-lifecycle.json"),JSON.stringify(report,null,2)+"\n");console.log("NEXT07_LIFECYCLE_SUMMARY",JSON.stringify({summary:report.summary,diagnosticPass:report.diagnosticPass,release:report.release}));
   server.closeAllConnections();server.close();
 }
