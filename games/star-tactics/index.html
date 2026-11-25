@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>별빛 전술 M5 — 턴제 분대 전술 | Aldol Engine</title>
+<meta property="og:title" content="별빛 전술 M5 — 턴제 분대 전술 | Aldol Engine">
+<meta property="og:description" content="Aldol Engine 차세대 코어 후보 실증 게임. 수호병·궁수·치유사 분대로 그림자 무리를 물리치는 턴제 전술. 임무 2개.">
+<meta property="og:type" content="website">
+<style>
+/* 페이지 전용 배치: 작은 화면에서는 조작 안내를 숨긴다 (버튼과 겹치지 않게). */
+@media (max-width: 1100px), (max-height: 520px) { #help { display: none; } }
+#phase { text-align: right; }
+/* 말풍선은 보드 위에 뜨므로 터치를 가로채지 않게 한다. */
+#bark { pointer-events: none; }
+@media (max-width: 640px) {
+  #hud { max-width: 50vw; box-sizing: border-box; }
+  #phase { max-width: 38vw; box-sizing: border-box; }
+  #bark { bottom: 98px; max-width: 80vw; }
+}
+@media (max-height: 520px) { #bark { bottom: 14px; left: 34%; max-width: 40vw; } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.187.0/build/three.module.js" } }
+</script>
+<script type="module">
+import {
+  game, loadWorld, SEED, SAVE_KEY,
+  listUnits, reachableCells, attackTargets, skillTargets, skillReady, missionOf,
+} from "./tactics.js";
+import { createBoard, easeTo } from "../../src/render/next/board.js";
+import { createSaveSlot, createRunner, startLoop, bindKeys, installProbe } from "../../src/render/next/shell.js";
+import { createAudioManager } from "../../src/render/audio.js";
+import {
+  installHudCss, createHudPanel, createBark, createHelp,
+  createRoundButton, bindMute, renderQuests, setSaveText,
+} from "../../src/render/hud.js";
+
+const manifest = await (await fetch("./world.json")).json();
+const world = loadWorld(manifest); // throws on an invalid world: the game stops before it starts
+const cols = world.missions[0].cols;
+const rows = world.missions[0].rows;
+if (world.missions.some((m) => m.cols !== cols || m.rows !== rows)) throw new Error("star-tactics page: all missions must share one board size");
+
+// Audio: procedural voices only (no audio files). BGM starts on the first gesture.
+const audio = createAudioManager();
+audio.setMuted(localStorage.getItem("aldol-engine.audio.muted") === "1");
+window.addEventListener("pointerdown", () => audio.startBgm(), { once: true });
+window.addEventListener("keydown", () => audio.startBgm(), { once: true });
+
+// --- HUD (shared kit, night theme) ---
+installHudCss("night");
+const panel = createHudPanel({
+  id: "hud",
+  title: "별빛 전술 M5",
+  rows: [
+    { id: "turn", tag: "div" },
+    { id: "unit", tag: "div" },
+    { id: "squad", tag: "div", collapsible: true },
+    { id: "quests", tag: "div", collapsible: true },
+    { id: "save-state", tag: "div", collapsible: true },
+  ],
+});
+// Short landscape screens: start collapsed too, so the panel does not cover the board.
+if (window.matchMedia("(max-height: 520px)").matches && !panel.el.classList.contains("collapsed")) {
+  document.getElementById("hud-toggle").click();
+}
+const phasePanel = createHudPanel({ id: "phase", position: "right", style: { color: "#ffe9a8", padding: "8px 12px" }, rows: [{ id: "phase-text", tag: "div" }, { id: "mission-text", tag: "div" }] });
+const bark = createBark();
+createHelp("클릭: 선택·이동·공격 · Tab: 다음 아군 · 방향키+Enter: 커서 · F: 스킬 · E: 턴 종료 · N: 새 게임 · M: 음소거", "center");
+
+// --- Runner: fixed step, one command per tick, versioned autosave ---
+const SAVE_EVENTS = new Set(["turnStart", "enemyPhase", "move", "hit", "heal", "missionClear", "won", "lost"]);
+const SAVE_NOTES = { turnStart: "턴 시작, 저장됨", missionClear: "임무 완료, 저장됨", won: "승리, 저장됨", lost: "패배, 저장됨" };
+const saveSlot = createSaveSlot({ key: SAVE_KEY, game, world });
+const runner = createRunner({
+  game, world, seed: SEED, saveSlot,
+  onStep: (state, events) => { if (events.length > 0) onEvents(state, events); },
+  shouldSave: (state, events) => {
+    let note = null;
+    for (const ev of events) if (SAVE_EVENTS.has(ev.type)) note = SAVE_NOTES[ev.type] || note || "저장됨";
+    return note;
+  },
+  autosaveTicks: 0,
+});
+
+// --- Board (shared adapter). Walls are drawn per mission below. ---
+const portrait = () => window.innerHeight > window.innerWidth;
+const insets = portrait() ? { top: 0.2, bottom: 0.2 } : { top: 0.12, bottom: 0.16 };
+const board = createBoard({ container: document.getElementById("app"), cols, rows, theme: "night", insets });
+window.addEventListener("resize", () => {
+  Object.assign(insets, portrait() ? { top: 0.2, bottom: 0.2 } : { top: 0.12, bottom: 0.16 });
+  board.fit();
+});
+const THREE = board.THREE;
+
+const wallGroup = new THREE.Group();
+board.scene.add(wallGroup);
+const wallGeo = new THREE.BoxGeometry(0.92, 0.8, 0.92);
+const wallMat = new THREE.MeshStandardMaterial({ color: 0x4a5078, roughness: 0.9 });
+let shownMission = -1;
+function showMission(index) {
+  shownMission = index;
+  wallGroup.clear();
+  for (const w of world.missions[index].walls) {
+    const p = board.cellToWorld(w.c, w.r);
+    const m = new THREE.Mesh(wallGeo, wallMat);
+    m.position.set(p.x, 0.4, p.z);
+    m.castShadow = true;
+    m.receiveShadow = true;
+    wallGroup.add(m);
+  }
+}
+
+// Unit meshes: primitives per class + team ring + HP bar.
+const CLASS_LOOK = {
+  guard: { color: 0x4f8cff, make: () => new THREE.BoxGeometry(0.5, 0.7, 0.5), y: 0.45 },
+  archer: { color: 0x3ecf8e, make: () => new THREE.ConeGeometry(0.3, 0.8, 10), y: 0.5 },
+  mender: { color: 0xffd166, make: () => new THREE.SphereGeometry(0.3, 14, 12), y: 0.45 },
+  wisp: { color: 0x8b3fd9, make: () => new THREE.SphereGeometry(0.28, 12, 10), y: 0.42 },
+  hexer: { color: 0xd94f8b, make: () => new THREE.OctahedronGeometry(0.34), y: 0.5 },
+  brute: { color: 0x8f2d2d, make: () => new THREE.BoxGeometry(0.66, 0.9, 0.66), y: 0.55 },
+};
+function makeUnitMesh(u) {
+  const look = CLASS_LOOK[u.cls] || CLASS_LOOK.wisp;
+  const g = new THREE.Group();
+  const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.06, 20), new THREE.MeshStandardMaterial({ color: u.team === "player" ? 0x66c2ff : 0xff6b6b, roughness: 0.6 }));
+  ring.position.y = 0.03;
+  const body = new THREE.Mesh(look.make(), new THREE.MeshStandardMaterial({ color: look.color, roughness: 0.55, metalness: 0.1 }));
+  body.position.y = look.y;
+  body.castShadow = true;
+  const barBg = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.1, 0.06), new THREE.MeshBasicMaterial({ color: 0x1a1a22 }));
+  barBg.position.y = 1.25;
+  const fill = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.07, 0.08), new THREE.MeshBasicMaterial({ color: u.team === "player" ? 0x6ee787 : 0xff7b72 }));
+  fill.position.y = 1.25;
+  g.add(ring, body, barBg, fill);
+  g.userData = { body, fill, baseY: look.y, placed: false };
+  return g;
+}
+const unitSync = board.createMeshSync(makeUnitMesh, (m, u, dt) => {
+  const p = board.cellToWorld(u.c, u.r);
+  if (!m.userData.placed) { m.position.set(p.x, 0, p.z); m.userData.placed = true; }
+  else easeTo(m, p.x, 0, p.z, dt);
+  const ratio = Math.max(0, u.hp / u.max);
+  m.userData.fill.scale.x = Math.max(0.001, ratio);
+  m.userData.fill.position.x = -0.38 * (1 - ratio);
+  m.userData.body.material.opacity = 1;
+  m.userData.body.material.emissive.setHex(u.team === "player" && u.ap === 0 ? 0x000000 : u.team === "player" ? 0x0a1a33 : 0x000000);
+});
+const moveLayer = board.createHighlightLayer({ y: 0.015, opacity: 0.32 });
+const targetLayer = board.createHighlightLayer({ y: 0.02, opacity: 0.55 });
+const markLayer = board.createHighlightLayer({ y: 0.025, opacity: 0.5 });
+
+// --- UI state (render side only; the sim sees only commands) ---
+let selected = null;
+let skillMode = false;
+let cursor = null;
+const className = (cls) => world.classes[cls].name;
+function firstPlayerUnit() {
+  const u = listUnits(runner.state).find((x) => x.team === "player");
+  return u ? u.id : null;
+}
+function selectedUnit() {
+  return listUnits(runner.state).find((u) => u.id === selected && u.team === "player") || null;
+}
+
+function actOnCell(cell) {
+  const state = runner.state;
+  if (state.phase !== "player") { bark.show(state.phase === "enemy" ? "적의 턴이에요" : "N 또는 새 게임 버튼으로 다시 시작해요"); return; }
+  const units = listUnits(state);
+  const at = units.find((u) => u.c === cell.c && u.r === cell.r) || null;
+  const sel = selectedUnit();
+  if (sel && skillMode) {
+    skillMode = false;
+    if (at && skillTargets(state, world, sel.id).includes(at.id)) { runner.push({ skill: { unit: sel.id, target: at.id } }); return; }
+    bark.show("스킬 대상이 아니에요");
+    return;
+  }
+  if (at && at.team === "player") { selected = at.id; audio.play("talk"); return; }
+  if (!sel) { bark.show("먼저 아군을 선택하세요"); return; }
+  if (at && at.team === "enemy") {
+    const spec = world.classes[sel.cls].attack;
+    if (sel.ap < spec.cost) bark.show(`AP가 부족해요 (공격 ${spec.cost} AP)`);
+    else if (!attackTargets(state, world, sel.id).includes(at.id)) bark.show("사거리 밖이거나 시야가 막혔어요");
+    else runner.push({ attack: { unit: sel.id, target: at.id } });
+    return;
+  }
+  if (reachableCells(state, world, sel.id).some((p) => p.c === cell.c && p.r === cell.r)) runner.push({ move: { unit: sel.id, c: cell.c, r: cell.r } });
+  else bark.show("거기까지는 갈 수 없어요");
+}
+function toggleSkill() {
+  const state = runner.state;
+  const sel = selectedUnit();
+  if (state.phase !== "player" || !sel) return;
+  const spec = world.classes[sel.cls].skill;
+  if (skillMode) { skillMode = false; return; }
+  if (!spec) bark.show("이 유닛은 스킬이 없어요");
+  else if (!skillReady(state, sel.id)) bark.show(`${spec.name}: 재사용 대기 중 (${sel.skillReadyAt - state.turn}턴)`);
+  else if (sel.ap < spec.cost) bark.show(`AP가 부족해요 (${spec.name} ${spec.cost} AP)`);
+  else if (skillTargets(state, world, sel.id).length === 0) bark.show(`${spec.name}: 쓸 대상이 없어요`);
+  else { skillMode = true; bark.show(`${spec.name}: 대상을 고르세요`); }
+}
+function endTurn() {
+  if (runner.state.phase === "player") { skillMode = false; runner.push({ endTurn: true }); }
+}
+function newGame() {
+  runner.restart();
+  selected = firstPlayerUnit();
+  skillMode = false;
+  cursor = null;
+  refreshHud();
+}
+function cycleUnit() {
+  const mine = listUnits(runner.state).filter((u) => u.team === "player");
+  if (mine.length === 0) return;
+  const i = mine.findIndex((u) => u.id === selected);
+  selected = mine[(i + 1) % mine.length].id;
+  skillMode = false;
+  cursor = { c: mine[(i + 1) % mine.length].c, r: mine[(i + 1) % mine.length].r };
+}
+function moveCursor(dc, dr) {
+  if (!cursor) {
+    const sel = selectedUnit();
+    cursor = sel ? { c: sel.c, r: sel.r } : { c: 0, r: 0 };
+  }
+  cursor = { c: Math.max(0, Math.min(cols - 1, cursor.c + dc)), r: Math.max(0, Math.min(rows - 1, cursor.r + dr)) };
+}
+
+board.onCellTap((cell) => { cursor = null; actOnCell(cell); });
+bindKeys({
+  Tab: cycleUnit,
+  ArrowUp: () => moveCursor(0, -1), ArrowDown: () => moveCursor(0, 1), ArrowLeft: () => moveCursor(-1, 0), ArrowRight: () => moveCursor(1, 0),
+  Enter: () => { if (cursor) actOnCell(cursor); },
+  " ": () => { if (cursor) actOnCell(cursor); },
+  e: endTurn, f: toggleSkill, n: newGame,
+});
+const endBtn = createRoundButton({ id: "end-btn", label: "턴 종료", size: 68, fontSize: 14, right: 12, bottom: 20, background: "rgba(160, 50, 90, 0.92)", onPress: endTurn });
+const skillBtn = createRoundButton({ id: "skill-btn", label: "스킬", size: 60, fontSize: 14, right: 88, bottom: 20, background: "rgba(60, 130, 90, 0.92)", onPress: toggleSkill });
+createRoundButton({ id: "new-btn", label: "새 게임", size: 52, fontSize: 12, right: 156, bottom: 20, background: "rgba(70, 80, 120, 0.92)", onPress: newGame });
+const muteBtn = createRoundButton({ id: "mute-btn", label: "🔊", size: 44, right: 216, bottom: 20, background: "rgba(20, 30, 60, 0.85)" });
+bindMute(audio, muteBtn);
+
+// --- Events from the sim (sounds, barks) ---
+function onEvents(state, events) {
+  for (const ev of events) {
+    if (ev.type === "hit") audio.play(ev.data.team === "player" ? "hurt" : "hit");
+    else if (ev.type === "heal") { audio.play("heal"); bark.show(`치유 +${ev.data.healed}`); }
+    else if (ev.type === "defeat") { audio.play("bite"); bark.show(ev.data.team === "enemy" ? `${ev.data.name} 격파!` : `${ev.data.name} 쓰러짐…`); }
+    else if (ev.type === "move") audio.play("cast");
+    else if (ev.type === "quest") audio.play("quest");
+    else if (ev.type === "missionClear") { audio.play("catch"); bark.show("임무 완료!"); }
+    else if (ev.type === "won") { audio.play("quest"); bark.show("모든 임무 완료! 승리 ★"); }
+    else if (ev.type === "lost") { audio.play("hurt"); bark.show("분대가 쓰러졌어요…"); }
+    else if (ev.type === "turnStart") { skillMode = false; }
+  }
+  refreshHud();
+}
+
+// --- HUD text ---
+function refreshHud() {
+  const state = runner.state;
+  const units = listUnits(state);
+  const mine = units.filter((u) => u.team === "player");
+  const foes = units.filter((u) => u.team === "enemy");
+  panel.slots["turn"].textContent = `턴 ${state.turn} · 아군 ${mine.length} · 적 ${foes.length} · ★${state.stars}`;
+  const sel = selectedUnit();
+  if (sel) {
+    const spec = world.classes[sel.cls].skill;
+    const cd = spec ? (skillReady(state, sel.id) ? "준비됨" : `${sel.skillReadyAt - state.turn}턴 뒤`) : "없음";
+    panel.slots["unit"].textContent = `${className(sel.cls)} · HP ${sel.hp}/${sel.max} · AP ${sel.ap} · 스킬 ${cd}`;
+  } else panel.slots["unit"].textContent = "아군을 눌러 선택하세요";
+  panel.slots["squad"].textContent = mine.map((u) => `${className(u.cls)} ${u.hp}/${u.max}`).join(" · ") || "분대 전멸";
+  renderQuests(panel.slots["quests"], state.quests, (q) => (q.done || q.target <= 1 ? "" : ` (${q.progress}/${q.target})`));
+  setSaveText(panel.slots["save-state"], runner.saveNote, runner.loadResult.ok ? "불러옴" : "새 게임");
+  phasePanel.slots["phase-text"].textContent =
+    state.phase === "won" ? "승리! ★" : state.phase === "lost" ? "패배…" : state.phase === "enemy" ? "적 턴" : skillMode ? "스킬 대상 선택" : "내 턴";
+  phasePanel.slots["mission-text"].textContent = missionOf(state, world).name;
+  endBtn.style.opacity = state.phase === "player" ? "1" : "0.45";
+  skillBtn.style.boxShadow = skillMode ? "0 0 0 3px #fff" : "";
+}
+
+selected = firstPlayerUnit();
+if (!runner.loadResult.ok && runner.loadResult.code !== "E_NONE") {
+  bark.show(`저장을 읽지 못해 새로 시작해요 (${runner.loadResult.code})`);
+}
+refreshHud();
+
+// --- Frame: sync meshes + highlights from sim state ---
+let lastUiKey = "";
+const stats = startLoop({
+  runner,
+  render(dt) {
+    const state = runner.state;
+    if (state.mission !== shownMission) { showMission(state.mission); selected = firstPlayerUnit(); skillMode = false; }
+    const units = listUnits(state);
+    if (selected !== null && !units.some((u) => u.id === selected && u.team === "player")) selected = firstPlayerUnit();
+    unitSync.sync(units, dt);
+    const sel = selectedUnit();
+    const playing = state.phase === "player" && sel;
+    moveLayer.set(playing && !skillMode ? reachableCells(state, world, sel.id) : [], 0x4da3ff);
+    let targets = [];
+    if (playing) {
+      const ids = skillMode ? skillTargets(state, world, sel.id) : (sel.ap >= world.classes[sel.cls].attack.cost ? attackTargets(state, world, sel.id) : []);
+      const heal = skillMode && world.classes[sel.cls].skill.kind === "heal";
+      targets = units.filter((u) => ids.includes(u.id)).map((u) => ({ c: u.c, r: u.r, color: heal ? 0x5dff9b : 0xff5d5d }));
+    }
+    targetLayer.set(targets);
+    const marks = [];
+    if (sel) marks.push({ c: sel.c, r: sel.r, color: 0xffe066 });
+    if (cursor) marks.push({ c: cursor.c, r: cursor.r, color: 0xffffff });
+    markLayer.set(marks);
+    const uiKey = `${selected}|${skillMode}|${state.phase}|${state.turn}`;
+    if (uiKey !== lastUiKey) { lastUiKey = uiKey; refreshHud(); }
+    bark.tick(dt);
+    board.render();
+  },
+});
+
+installProbe({
+  runner, game, board,
+  extra: {
+    saveKey: SAVE_KEY,
+    ui: () => ({ selected, skillMode, cursor }),
+    pending: () => runner.pending,
+    loop: () => ({ frames: stats.frames, ticks: stats.ticks }),
+  },
+});
+</script>
+</body>
+</html>

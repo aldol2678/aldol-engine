@@ -1,0 +1,185 @@
+{
+  "tool": "tools/next/browser-perf.mjs",
+  "root": "/home/user/aldol-engine",
+  "browser": "chromium 158.0.8127.36 (headless, software GL)",
+  "viewport": "1280x800",
+  "framesPerRun": 240,
+  "reps": 3,
+  "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+  "rows": [
+    {
+      "game": "supuli",
+      "median_frame_p50_ms": 50,
+      "median_frame_p95_ms": 50.1,
+      "median_heap_mb": 8.07,
+      "runs": [
+        {
+          "rep": 1,
+          "frame_p50_ms": 50,
+          "frame_p95_ms": 66.6,
+          "frame_max_ms": 66.8,
+          "heap_mb": 8.07
+        },
+        {
+          "rep": 2,
+          "frame_p50_ms": 50,
+          "frame_p95_ms": 50.1,
+          "frame_max_ms": 66.7,
+          "heap_mb": 8.09
+        },
+        {
+          "rep": 3,
+          "frame_p50_ms": 50,
+          "frame_p95_ms": 50.1,
+          "frame_max_ms": 66.7,
+          "heap_mb": 7.64
+        }
+      ]
+    },
+    {
+      "game": "star-fishing",
+      "median_frame_p50_ms": 66.7,
+      "median_frame_p95_ms": 83.4,
+      "median_heap_mb": 9.3,
+      "runs": [
+        {
+          "rep": 1,
+          "frame_p50_ms": 66.7,
+          "frame_p95_ms": 83.4,
+          "frame_max_ms": 100,
+          "heap_mb": 9.42
+        },
+        {
+          "rep": 2,
+          "frame_p50_ms": 66.7,
+          "frame_p95_ms": 83.4,
+          "frame_max_ms": 100.1,
+          "heap_mb": 9.23
+        },
+        {
+          "rep": 3,
+          "frame_p50_ms": 66.7,
+          "frame_p95_ms": 83.4,
+          "frame_max_ms": 116.7,
+          "heap_mb": 9.3
+        }
+      ]
+    },
+    {
+      "game": "star-defense",
+      "median_frame_p50_ms": 50,
+      "median_frame_p95_ms": 66.7,
+      "median_heap_mb": 10.75,
+      "runs": [
+        {
+          "rep": 1,
+          "frame_p50_ms": 50,
+          "frame_p95_ms": 66.7,
+          "frame_max_ms": 66.8,
+          "heap_mb": 10.75
+        },
+        {
+          "rep": 2,
+          "frame_p50_ms": 50,
+          "frame_p95_ms": 66.7,
+          "frame_max_ms": 66.8,
+          "heap_mb": 10.29
+        },
+        {
+          "rep": 3,
+          "frame_p50_ms": 50,
+          "frame_p95_ms": 66.7,
+          "frame_max_ms": 83.4,
+          "heap_mb": 10.82
+        }
+      ]
+    },
+    {
+      "game": "rune-vault",
+      "median_frame_p50_ms": 50,
+      "median_frame_p95_ms": 50.1,
+      "median_heap_mb": 8.39,
+      "runs": [
+        {
+          "rep": 1,
+          "frame_p50_ms": 50,
+          "frame_p95_ms": 50.1,
+          "frame_max_ms": 66.8,
+          "heap_mb": 7.89
+        },
+        {
+          "rep": 2,
+          "frame_p50_ms": 50,
+          "frame_p95_ms": 66.6,
+          "frame_max_ms": 66.7,
+          "heap_mb": 8.71
+        },
+        {
+          "rep": 3,
+          "frame_p50_ms": 50,
+          "frame_p95_ms": 50.1,
+          "frame_max_ms": 83.3,
+          "heap_mb": 8.39
+        }
+      ]
+    },
+    {
+      "game": "star-tactics",
+      "median_frame_p50_ms": 33.3,
+      "median_frame_p95_ms": 50,
+      "median_heap_mb": 9.5,
+      "runs": [
+        {
+          "rep": 1,
+          "frame_p50_ms": 33.3,
+          "frame_p95_ms": 50,
+          "frame_max_ms": 50.1,
+          "heap_mb": 9.5
+        },
+        {
+          "rep": 2,
+          "frame_p50_ms": 33.3,
+          "frame_p95_ms": 50,
+          "frame_max_ms": 50.1,
+          "heap_mb": 9.63
+        },
+        {
+          "rep": 3,
+          "frame_p50_ms": 33.3,
+          "frame_p95_ms": 50,
+          "frame_max_ms": 50.1,
+          "heap_mb": 8.59
+        }
+      ]
+    },
+    {
+      "game": "star-foundry",
+      "median_frame_p50_ms": 33.3,
+      "median_frame_p95_ms": 33.4,
+      "median_heap_mb": 8.28,
+      "runs": [
+        {
+          "rep": 1,
+          "frame_p50_ms": 33.3,
+          "frame_p95_ms": 50,
+          "frame_max_ms": 66.6,
+          "heap_mb": 8.16
+        },
+        {
+          "rep": 2,
+          "frame_p50_ms": 33.3,
+          "frame_p95_ms": 33.4,
+          "frame_max_ms": 50.1,
+          "heap_mb": 8.42
+        },
+        {
+          "rep": 3,
+          "frame_p50_ms": 33.3,
+          "frame_p95_ms": 33.4,
+          "frame_max_ms": 50.1,
+          "heap_mb": 8.28
+        }
+      ]
+    }
+  ]
+}

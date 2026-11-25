@@ -1,0 +1,147 @@
+PASS tactics manifest valid — []
+PASS tactics world adapted — missions=2 units=7,8 quests=4
+PASS enemy roster has at least two kinds per mission
+PASS assets are builtin primitives only (no GLB, no URL)
+PASS save key
+PASS manifest rejected: wrong schema version — invalid world manifest: [{"code":"E_SCHEMA_VERSION","path":"schemaVersion","detail":"worldforge/0.2"
+PASS manifest rejected: rule disabled — world manifest has no enabled "game.tactics" rule
+PASS manifest rejected: other project — world manifest is for project "star-defense", expected "star-tactics"
+PASS manifest rejected: unit with unknown class — star-tactics: unit m1-guard has unknown class "dragon"
+PASS manifest rejected: unit on a wall — star-tactics: unit m1-guard starts on a wall or outside the map
+PASS manifest rejected: unit outside the map — star-tactics: unit m1-guard starts on a wall or outside the map
+PASS manifest rejected: two units on one cell — star-tactics: two units start on 1,2
+PASS manifest rejected: ragged tile rows — parseTileRows: all rows must have the same non-zero length
+PASS manifest rejected: mission without enemies — star-tactics: mission mission-1 needs both teams
+PASS manifest rejected: duplicate mission id — star-tactics: bad or duplicate mission id mission-1
+PASS manifest rejected: class with zero hp — star-tactics: bad class guard
+PASS manifest rejected: unknown skill kind — star-tactics: class mender has unknown skill kind "teleport"
+PASS manifest rejected: bad timing — star-tactics: bad timing config
+PASS manifest rejected: broken asset ref — invalid world manifest: [{"code":"E_ASSET_REF_NOT_FOUND","path":"entities[0].assetId","detail":"ghos
+PASS manifest rejected: quest without condition — quests: first-blood has no condition node (params.stat)
+PASS ids follow manifest order (players first)
+PASS reachable cells respect AP and occupancy
+PASS move at the AP boundary (4 cells, 4 AP) succeeds
+PASS move with 0 AP is ignored
+PASS move beyond AP (5 cells, 4 AP) is ignored
+PASS move onto a wall is ignored
+PASS move onto an occupied cell is ignored
+PASS out-of-bounds / fractional / enemy-unit / unknown-unit moves are ignored
+PASS garbage inputs change nothing but the tick
+PASS cannot path through another unit
+PASS move through a blocking unit is ignored
+PASS ranged attack: range boundary (4 in, 5 out)
+PASS attack out of range is ignored (no AP spent, no RNG drawn)
+PASS attack in range costs AP, draws 2 RNG values, armor applies — dealt=3
+PASS attack without enough AP is ignored
+PASS friendly fire / self / enemy-as-attacker / unknown target ignored
+PASS melee range boundary (distance 2 is out)
+PASS line of sight blocked by a wall
+PASS attack through a wall is ignored
+PASS attack helper with a hypothetical position sees past the wall
+PASS heal has no target while everyone is at full hp
+PASS heal on a full-hp ally is ignored (no AP, no cooldown)
+PASS heal targets: wounded allies in range only (range 3 in, 4 out)
+PASS heal out of range is ignored
+PASS heal is capped at max hp and counted as actually healed
+PASS skill on cooldown is ignored
+PASS turn 2: still cooling down (boundary - 1)
+PASS turn 2: skill still refused
+PASS turn 3: cooldown ready exactly at readyAt
+PASS turn 3: heal works again
+PASS heal quest completes and pays its star once
+PASS quest reward is not paid twice
+PASS heal cannot target an enemy
+PASS strike skill cannot target an ally
+PASS strike skill: bonus damage, AP cost 3, cooldown 3 turns — dealt=8
+PASS strike skill without AP / on cooldown is ignored
+PASS endTurn switches to the enemy phase with the queue in id order
+PASS player commands during the enemy phase are ignored
+PASS enemies act one at a time in id order (3 AP each) — 3,3,3,4,4,4,5,5,5
+PASS next player turn: turn counter +1, player AP refilled
+PASS enemy actions are paced by enemyActionTicks — tick=68
+PASS fsm: hold stays while unaware
+PASS fsm: hold -> advance on sight
+PASS fsm: advance -> attack with a target
+PASS fsm: attack -> advance when the target is gone
+PASS fsm: advance -> retreat on low hp (priority over attack)
+PASS fsm: retreat holds until cornered with a target
+PASS fsm: cornered attacker does not flip back to retreat
+PASS fsm: hold -> advance when hurt
+PASS fsm: hold -> advance when alerted
+PASS enemy context: out of sight
+PASS holding enemies pass instantly — ticks=13
+PASS enemy context: sight boundary (distance 5 == sight 5)
+PASS wisp advances 3 cells toward the player; unaware hexer still holds
+PASS hurt hexer wakes, then retreats away from the squad — ai=retreat at=4,4
+PASS enemy target tie: equal hp -> lower id is attacked — guard=8 archer=10
+PASS enemy target choice: weakest unit in range first
+PASS defeated unit is removed and counted
+PASS attacking a dead unit is ignored
+PASS last enemy down on the last mission -> won
+PASS commands after victory are ignored
+PASS last player unit down -> lost
+PASS lost is terminal (enemy phase stops)
+PASS bot clears both missions with the reference seed — {"phase":"won","mission":1,"turn":6,"stars":6,"players":3,"enemies":0,"stats":{"defeated":9,"fallen":0,"healed":0,"missionsCleared":2,"moves":10,"turns":10},"questsDone":3}
+PASS mission 2 follows mission 1 with a fresh squad
+PASS bot wins on 12 further seeds — wins=12/12
+PASS passive play (only ending turns) loses on 10 seeds — lost=10/10 turns=10,9,10,10,10,11,10,11,11,11
+PASS restart gives a clean state
+PASS mission 2 spawns new entity ids
+PASS reference run is reproducible from its input script — frames=476
+PASS pinned reference hash (seed star-tactics-m5, bot script) — hash=7cc35f94 frames=476
+PASS every bot command is accepted by the sim — illegal=0
+PASS determinism star-tactics: 12 seeds rerun identical
+PASS determinism star-tactics: 12 seeds replay identical
+PASS determinism star-tactics: 12 seeds save/restore mid-run identical
+PASS different seeds give different outcomes
+PASS damage rolls come from the seeded RNG only
+PASS save star-tactics: round-trip accepted
+PASS save star-tactics: empty rejected
+PASS save star-tactics: truncated rejected
+PASS save star-tactics: tampered payload rejected
+PASS save star-tactics: unknown version rejected
+PASS save star-tactics: older version rejected
+PASS save star-tactics: other game's save rejected
+PASS save star-tactics: wrong format rejected
+PASS save star-tactics: legacy M3 save shape rejected
+PASS save star-tactics: re-signed but invalid state rejected
+PASS valid mid-battle state accepted
+PASS state rejected: unknown phase
+PASS state rejected: mission out of range
+PASS state rejected: unit on a wall
+PASS state rejected: two units on one cell
+PASS state rejected: hp above max
+PASS state rejected: unknown class
+PASS state rejected: enemy with a bogus AI state
+PASS state rejected: unknown component store
+PASS state rejected: negative stat
+PASS state rejected: quest rewarded but not done
+PASS restore refuses an invalid state — star-tactics: cannot restore: phase
+PASS sim reuses the shared core (>= 3 modules from src/core/next/) — ecs,runtime,spatial,fsm,combat,quest,save,manifest
+PASS sim imports core/next/ecs.js
+PASS sim imports core/next/runtime.js
+PASS sim imports core/next/spatial.js
+PASS sim imports core/next/fsm.js
+PASS sim imports core/next/combat.js
+PASS sim imports core/next/quest.js
+PASS sim imports core/next/save.js
+PASS sim imports core/next/manifest.js
+PASS sim does not import rendering or other games
+PASS sim hardcodes no class or map data
+PASS state.ecs is a plain shared-ECS state
+PASS page has module script games/star-tactics/index.html
+PASS syntax games/star-tactics/index.html script[0]
+PASS page uses the shared HUD kit, board and shell
+PASS page pins three 0.187.0 and uses the per-game save key export
+PASS syntax games/star-tactics/tactics.js
+PASS syntax tools/next/play/star-tactics.mjs
+PASS syntax tools/next/play/star-tactics-bot.mjs
+PASS no Math.random in games/star-tactics/tactics.js
+PASS no Date.now in games/star-tactics/tactics.js
+PASS no performance.now in games/star-tactics/tactics.js
+PASS no new Date in games/star-tactics/tactics.js
+PASS no setTimeout in games/star-tactics/tactics.js
+PASS no setInterval in games/star-tactics/tactics.js
+PASS no fetch( in games/star-tactics/tactics.js
+PASS no localStorage in games/star-tactics/tactics.js
+ALL CHECKS PASSED (146)
