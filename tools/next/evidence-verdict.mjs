@@ -8,8 +8,10 @@ export function judgeAsset({expected:e,request:r,server:s,document:d,playwright:
   if(!e||!r||!s||!d)return {verdict:"HOLD_MISSING_EVIDENCE",reason:"missing request, server, document or expected bytes"};
   const token=r.token;
   if(!token||s.token!==token||s.path!==e.urlPath||pathOf(r.url)!==e.urlPath||r.nav!==d.nav)return {verdict:"HOLD_ATTRIBUTION",reason:"token/path/document mismatch"};
-  const f=exactly(d.fetchRows,x=>x.token===token&&pathOf(x.url)===e.urlPath);
-  const parsed=exactly(d.rows,x=>x.token===token&&pathOf(x.modelUrl)===e.urlPath);
+  const f=exactly(d.fetchRows,x=>pathOf(x.url)===e.urlPath);
+  const decodedRow=exactly(d.rows,x=>pathOf(x.modelUrl)===e.urlPath);
+  const parsed=decodedRow?.token===token?decodedRow:null;
+  if(f&&f.token!==token)return {verdict:"HOLD_ATTRIBUTION",reason:"application response token differs"};
   const response=exactly(pw,x=>x.event==="response"&&x.token===token&&pathOf(x.url)===e.urlPath&&x.nav===d.nav);
   if(!response)return {verdict:"HOLD_ATTRIBUTION",reason:"unique response not traced in Playwright"};
   const fallback=arr(d.assets?.failed).includes(e.name.replace(/\.glb$/,""));
@@ -26,7 +28,7 @@ export function judgeAsset({expected:e,request:r,server:s,document:d,playwright:
     return {verdict:"HOLD_OR_FAIL_DECODE",reason:"application decode not proven"};
   if(r.status!==200||f.status!==200||response.status!==200||s.status!==200||s.finished!==true||s.bytesRead!==e.bytes)
     return {verdict:"HOLD_TRANSFER_CONFLICT",reason:"decoded asset but transfer evidence inconsistent"};
-  if(r.terminal==="loadingFinished"&&sameBody(r.body,e)&&exactly(pw,x=>x.event==="finished"&&x.token===token))
+  if(r.terminal==="loadingFinished"&&sameBody(r.body,e)&&!r.bodyError&&exactly(pw,x=>x.event==="finished"&&x.token===token)&&!arr(pw).some(x=>x.event==="failed"&&x.token===token))
     return {verdict:"PASS",reason:"response, exact bytes and decoder all agree"};
   const abort=exactly(pw,x=>x.event==="failed"&&x.token===token&&x.errorText==="net::ERR_ABORTED");
   // Strict qualification: unique response token, full original bytes at the
@@ -45,9 +47,11 @@ export function judgeGlb(run,expected) {
     records.push({nav:d.nav,asset:e.name,token:r?.token??null,...judgeAsset({expected:e,request:r,server:s,document:d,playwright:arr(run.glbTrace)})});
   }
   const tokens=requests.map(x=>x.token);
-  const coverage=documents.length===3&&new Set(documents.map(x=>x.nav)).size===3&&requests.length===6&&server.length===6&&tokens.every(Boolean)&&new Set(tokens).size===6&&!run.cdp?.bodyCollectionTimedOut;
-  const known=new Set(tokens);
-  const unexplained=arr(run.requestFailuresDuringTest).filter(x=>!x.token||!known.has(x.token));
+  const coverage=expected.length===2&&new Set(expected.map(e=>e.urlPath)).size===2&&documents.length===3&&[1,2,3].every(nav=>documents.some(d=>d.nav===nav))&&requests.length===6&&server.length===6&&tokens.every(Boolean)&&new Set(tokens).size===6&&run.cdp?.bodyCollectionTimedOut===false;
+  const unexplained=arr(run.requestFailuresDuringTest).filter(x=>{
+    const record=exactly(records,r=>r.token===x.token&&r.nav===x.nav&&r.asset===pathOf(x.url)?.split("/").at(-1));
+    return !record||record.verdict!=="HOLD_OBSERVATION_MISMATCH"||x.kind!=="requestfailed"||x.status!==200||x.errorText!=="net::ERR_ABORTED";
+  });
   const failures=records.filter(x=>x.verdict.startsWith("FAIL_"));
   const decodeProven=coverage&&records.length===6&&records.every(x=>["PASS","HOLD_OBSERVATION_MISMATCH"].includes(x.verdict));
   const issuesKnown=Array.isArray(run.functionalIssues);
