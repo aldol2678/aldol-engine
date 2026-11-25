@@ -348,6 +348,13 @@ function saveGame(note) {
 }
 setInterval(() => saveGame("자동 저장됨"), 5000);
 addEventListener("beforeunload", () => saveGame("저장됨"));
+// Lifecycle fallback: beforeunload is not guaranteed (especially on mobile
+// or automated reload). Save the existing v4 payload when the page is hidden
+// or leaves the active document. No change to simulation or save schema.
+addEventListener("pagehide", () => saveGame("저장됨"));
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") saveGame("저장됨");
+});
 
 // --- HUD + bark ---
 const questsEl = panel.slots["quests"];
