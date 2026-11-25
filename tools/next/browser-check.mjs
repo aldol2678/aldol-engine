@@ -20,7 +20,8 @@ import path from "node:path";
 import http from "node:http";
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
-import {parseTap,expectedFishingAssets,observeGlb,correlateGlbEvidence} from "./glb-observer.mjs";
+import {instrumentVendor,fetchTraceInit,expectedFishingAssets,observeGlb,correlateGlbEvidence} from "./glb-observer.mjs";
+import {judgeGlb} from "./evidence-verdict.mjs";
 
 const require = createRequire(import.meta.url);
 const ROOT = path.resolve(new URL("../../", import.meta.url).pathname);
@@ -33,6 +34,8 @@ const firefoxProfile = argOf("--firefox-profile","default-headless");
 const settleGlb = args.includes("--settle-glb");
 const glbObserve=args.includes("--glb-observe");
 const glbContentLength=args.includes("--glb-content-length");
+const glbFault=argOf("--glb-fault","none");
+if(!["none","truncate","corrupt","404"].includes(glbFault)||glbFault!=="none"&&!glbObserve)throw Error("invalid GLB fault control");
 let glbToken=0;
 if (!selectedEngines.length || new Set(selectedEngines).size !== selectedEngines.length ||
     selectedEngines.some(x=>!["chromium","firefox","webkit"].includes(x))) throw Error("invalid --engines");
@@ -76,11 +79,26 @@ function startServer() {
     const headers={"content-type": MIME[path.extname(file)] || "application/octet-stream", "cache-control": "no-store"};
     const token=glbObserve&&rel.endsWith(".glb")?"glb-"+(++glbToken):null;
     if(token){headers["x-next06-glb-id"]=token;if(glbContentLength)headers["content-length"]=fs.statSync(file).size;}
+    if(token&&rel.endsWith("/star-fish.glb")&&glbFault!=="none"){
+      const original=fs.readFileSync(file);
+      const status=glbFault==="404"?404:200;
+      const sent=glbFault==="404"?Buffer.from("missing"):glbFault==="truncate"?original.subarray(0,Math.floor(original.length/2)):Buffer.from(original);
+      if(glbFault==="corrupt")sent[0]^=255;
+      headers["content-length"]=glbFault==="truncate"?original.length:sent.length;
+      const entry={path:rel,token,status,fault:glbFault,started:Date.now(),size:original.length,bytesRead:sent.length,finished:false,closed:false};
+      serverGlbTrace.push(entry);
+      res.once("finish",()=>{entry.finished=true;entry.finishAt=Date.now();});
+      res.once("close",()=>{entry.closed=true;entry.closeAt=Date.now();});
+      res.writeHead(status,headers);
+      if(glbFault==="truncate"){res.flushHeaders();res.write(sent);setTimeout(()=>res.destroy(),250);}
+      else res.end(sent);
+      return;
+    }
     res.writeHead(200,headers);
-    if(glbObserve&&rel==="/src/render/vendor/GLTFLoader.js"){res.end(fs.readFileSync(file,"utf8")+"\n"+parseTap);return;}
+    if(glbObserve&&rel==="/src/render/vendor/GLTFLoader.js"){res.end(instrumentVendor(fs.readFileSync(file,"utf8")));return;}
     const stream=fs.createReadStream(file);
     if (rel.endsWith(".glb")) {
-      const entry={path:rel,token,started:Date.now(),size:fs.statSync(file).size,remotePort:req.socket.remotePort,finished:false,closed:false};
+      const entry={path:rel,token,status:200,started:Date.now(),size:fs.statSync(file).size,remotePort:req.socket.remotePort,finished:false,closed:false};
       serverGlbTrace.push(entry);
       res.once("finish",()=>{entry.finished=true;entry.finishAt=Date.now();entry.bytesRead=stream.bytesRead;});
       res.once("close",()=>{entry.closed=true;entry.closeAt=Date.now();entry.bytesRead=stream.bytesRead;});
@@ -168,6 +186,7 @@ async function main() {
           if (!fs.existsSync(file)) return route.fulfill({ status: 404, body: "" });
           return route.fulfill({ status: 200, contentType: "text/javascript", body: fs.readFileSync(file) });
         });
+        if(glbObserve)await context.addInitScript(fetchTraceInit);
         const page = await context.newPage();
         const consoleErrors = [];
         const failedRequests = [];
@@ -208,7 +227,7 @@ async function main() {
           if(r.status()>=400){failedRequests.push(`${r.status()} ${r.url()}`);requestFailures.push({kind:"http",id:requestId(req),url:r.url(),status:r.status(),at:Date.now(),nav,stage});}
         });
 
-        const result = { engine: engine.name, game: gameId, config: configName, label: cfg.label, result: "FAIL", steps: [], issues: [], consoleErrors, failedRequests, requestFailures, glbTrace, navigation, firefoxProfile: engine.name==="firefox"?firefoxProfile:null, settleGlb };
+        const result = { engine: engine.name, game: gameId, config: configName, label: cfg.label, result: "FAIL", steps: [], issues: [], consoleErrors, failedRequests, requestFailures, glbTrace, navigation, firefoxProfile: engine.name==="firefox"?firefoxProfile:null, settleGlb, glbFault };
         const url = `${base}/${scenario.meta.path}`;
         async function captureDecoded(){if(observer){const doc=await observer.captureDocument(expectedGlb);ctx.expect(doc.ok,`both original GLB byte hashes and meshes decoded in navigation ${nav}`);}}
         const shot = async (tag) => {
@@ -289,6 +308,7 @@ async function main() {
           result.hudEnd = hud1.issues;
           hudExpect("end", hud1.issues);
           await shot("end");
+          result.functionalIssues=[...result.issues];
           if(observer){
             result.cdp=await observer.finish();
             result.glbEvidence=correlateGlbEvidence(result.cdp,glbTrace,serverGlbTrace.slice(serverStart),expectedGlb);
@@ -313,6 +333,7 @@ async function main() {
         mark("teardown");await context.close();
         result.serverGlbTrace=serverGlbTrace.slice(serverStart);
         result.requestFailuresDuringTest=requestFailures.filter(e=>e.stage!=="teardown");
+        if(observer)result.separatedVerdicts=judgeGlb(result,expectedGlb);
         console.log(`${result.result} ${engine.name} ${gameId} ${configName}${result.issues.length ? " — " + result.issues.join(" | ") : ""}`);
         if(result.requestFailuresDuringTest.length) console.log("REQUEST_FAILURES",JSON.stringify(result.requestFailuresDuringTest));
         results.push(result);
@@ -339,7 +360,7 @@ async function main() {
     three: "0.187.0 (local copy of the npm package served for the unpkg importmap URL)",
     engines: engines.map((e) => ({ name: e.name, status: e.status || "NOT RUN (browser not installed in this environment)", ...(e.error ? { error: e.error } : {}) })),
     realDevices: "NOT RUN (touch results are browser touch emulation, not real devices)",
-    firefoxProfile, settleGlb, selectedEngines,glbObserve,glbContentLength,expectedGlb,
+    firefoxProfile, settleGlb, selectedEngines,glbObserve,glbContentLength,glbFault,expectedGlb,
     results,
     superseded,
   };
