@@ -1,0 +1,145 @@
+{
+  "task": "ENGINE-NEXT-01 · 결정적 공통 엔진 확장 + 신규 장르 3종 실증 (Issue #5)",
+  "agent": "athena",
+  "date": "2026-11-25",
+  "repo": "aldol2678/aldol-engine",
+  "base": "df9a494647db3261658a5108a098e82cff927208",
+  "commit": "a98dad6cedaecc076cc8826e4b2f39643072310a",
+  "branch": "ccr-e410efe4-sqwcin",
+  "files": [
+    "docs/engine-next-01/API.md",
+    "docs/engine-next-01/AUDIT.md",
+    "docs/engine-next-01/GUIDE.md",
+    "docs/engine-next-01/README.md",
+    "docs/engine-next-01/VERIFICATION.md",
+    "games/rune-vault/README.md",
+    "games/rune-vault/index.html",
+    "games/rune-vault/vault.js",
+    "games/rune-vault/world.json",
+    "games/star-foundry/README.md",
+    "games/star-foundry/foundry.js",
+    "games/star-foundry/index.html",
+    "games/star-foundry/world.json",
+    "games/star-tactics/README.md",
+    "games/star-tactics/index.html",
+    "games/star-tactics/tactics.js",
+    "games/star-tactics/world.json",
+    "src/core/next/combat.js",
+    "src/core/next/ecs.js",
+    "src/core/next/fsm.js",
+    "src/core/next/index.js",
+    "src/core/next/inventory.js",
+    "src/core/next/manifest.js",
+    "src/core/next/quest.js",
+    "src/core/next/runtime.js",
+    "src/core/next/save.js",
+    "src/core/next/spatial.js",
+    "src/render/next/board.js",
+    "src/render/next/shell.js",
+    "tools/check-next-all.mjs",
+    "tools/check-next.mjs",
+    "tools/check-rune-vault.mjs",
+    "tools/check-star-foundry.mjs",
+    "tools/check-star-tactics.mjs",
+    "tools/next/bench.mjs",
+    "tools/next/browser-check.mjs",
+    "tools/next/browser-perf.mjs",
+    "tools/next/harness.mjs",
+    "tools/next/play/rune-vault-solutions.mjs",
+    "tools/next/play/rune-vault.mjs",
+    "tools/next/play/star-defense.mjs",
+    "tools/next/play/star-fishing.mjs",
+    "tools/next/play/star-foundry-stress.mjs",
+    "tools/next/play/star-foundry.mjs",
+    "tools/next/play/star-tactics-bot.mjs",
+    "tools/next/play/star-tactics.mjs",
+    "tools/next/play/supuli.mjs",
+    "docs/engine-next-01/captures/ (32 PNG)",
+    "docs/engine-next-01/perf/ (11 JSON)",
+    "docs/engine-next-01/logs/ (10 files)",
+    "docs/engine-next-01/handoff.json"
+  ],
+  "checks": [
+    {
+      "name": "baseline npm run check:all (origin/main df9a494)",
+      "result": "PASS",
+      "detail": "ALL CHECKS PASSED x3; hashes 754a144e / 7eb7f2df / 0d316768 (logs/baseline-check-all.log)"
+    },
+    {
+      "name": "candidate npm run check:all",
+      "result": "PASS",
+      "detail": "ALL CHECKS PASSED x3; same three hashes; 0 existing files modified (logs/candidate-check-all.log)"
+    },
+    {
+      "name": "node tools/check-next-all.mjs",
+      "result": "PASS",
+      "detail": "check-next 262, check-rune-vault 135, check-star-tactics 146, check-star-foundry 129 (logs/check-next-all.log)"
+    },
+    {
+      "name": "simulate rune-vault seed=rune-vault-m4 frames=280 (solution script)",
+      "result": "PASS",
+      "detail": "hash=7772d3f5"
+    },
+    {
+      "name": "simulate star-tactics seed=star-tactics-m5 frames=476 (bot script)",
+      "result": "PASS",
+      "detail": "hash=7cc35f94"
+    },
+    {
+      "name": "simulate star-foundry seed=star-foundry-m6 frames=2400 (factory script)",
+      "result": "PASS",
+      "detail": "hash=02462c74"
+    },
+    {
+      "name": "determinism: 12 seeds x 3 new games (rerun / replay / save-restore mid-run)",
+      "result": "PASS",
+      "detail": "logs/check-rune-vault.log, check-star-tactics.log, check-star-foundry.log"
+    },
+    {
+      "name": "node tools/next/browser-check.mjs (Chromium 158 headless, 6 games x 4 viewports)",
+      "result": "PASS",
+      "detail": "24/24 after a scenario fix; first full run had 2 FAIL on existing-game scenarios (kept in logs/browser-check.log and browser-check.json superseded)"
+    },
+    {
+      "name": "browser check on Firefox / WebKit",
+      "result": "NOT RUN",
+      "detail": "browsers not installed in this environment"
+    },
+    {
+      "name": "real-device check (touch, performance)",
+      "result": "NOT RUN",
+      "detail": "touch results are Chromium emulation only"
+    },
+    {
+      "name": "node tools/next/bench.mjs (baseline vs candidate, 100/500/1000 entities, 3 reps)",
+      "result": "PASS",
+      "detail": "measured; existing sims byte-identical, differences within run-to-run noise (perf/*.json, VERIFICATION.md G5)"
+    },
+    {
+      "name": "node tools/next/browser-perf.mjs (baseline vs candidate frame time)",
+      "result": "PASS",
+      "detail": "measured on headless software GL; existing games identical p50/p95 (perf/browser-perf-*.json)"
+    },
+    {
+      "name": "npm run verify:wasm",
+      "result": "NOT RUN",
+      "detail": "workspace-only toolchain; no WASM source or binary changed"
+    },
+    {
+      "name": "independent verification (G7)",
+      "result": "HOLD",
+      "detail": "no other agent or human has reproduced these results"
+    }
+  ],
+  "notes": [
+    "개발 후보다. main 병합·운영/Preview 배포·공식 채택은 하지 않았다.",
+    "HOLD: 브랜치 이름 — Issue 지정 feat/athena-engine-next-01 대신 세션 지정 브랜치 ccr-e410efe4-sqwcin 사용 (main에서 갈라진 새 독립 브랜치).",
+    "HOLD: package.json 미수정(한 줄 파일, MarginLife PR #1~#4 전부와 충돌) — 신규 검사는 node tools/check-next-all.mjs로만 돌고 check:all/CI/pre-push에는 연결되지 않았다.",
+    "Issue 본문은 open PR 0건이라고 했지만 실제로는 Draft PR #1~#4(MarginLife)가 열려 있다. 그 브랜치와 경로는 건드리지 않았다.",
+    "배포 미유발 판단은 GitHub 쪽 관측 증거(워크플로 내용, 기존 Draft PR의 check run/status/댓글)에 근거한다. Cloudflare 대시보드는 확인하지 못했다(NOT RUN).",
+    "기준선 관찰(기존 게임, 이번 변경과 무관): 좁은 화면 HUD 겹침, 별수호 844x390 가로에서 spot-3 탭 무반응 — VERIFICATION.md G4.",
+    "랜딩/sitemap/README/AGENTS.md는 갱신하지 않았다(채택 단계의 일).",
+    "룬 금고·별빛 전술 전체와 별 공방의 심·체크는 같은 세션의 병렬 하위 에이전트가 작성했고 주 에이전트가 검사를 재실행했다. 독립 검증이 아니다."
+  ],
+  "verified_by": "미검증"
+}
