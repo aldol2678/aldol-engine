@@ -133,8 +133,11 @@ async function main() {
   for (const engine of engines.filter((e) => e.available)) {
     let browser;
     try {
-      const options = engine.name !== "firefox" || firefoxProfile === "default-headless" ? {} :
-        {headless:firefoxProfile !== "headed-software",env:{...process.env,LIBGL_ALWAYS_SOFTWARE:"1"}};
+      const headlessEnv=Object.fromEntries(Object.entries(process.env).filter(([k])=>!["DISPLAY","WAYLAND_DISPLAY","LIBGL_ALWAYS_SOFTWARE"].includes(k)));
+      const options=engine.name!=="firefox"?{}:firefoxProfile==="default-headless"?
+        {headless:true,env:headlessEnv}:firefoxProfile==="headless-software"?
+        {headless:true,env:{...headlessEnv,LIBGL_ALWAYS_SOFTWARE:"1"}}:
+        {headless:false,env:{...process.env,LIBGL_ALWAYS_SOFTWARE:"1"}};
       browser = await engine.type.launch(options);
       engine.status = "RUN";
     } catch (error) {
