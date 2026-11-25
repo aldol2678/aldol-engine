@@ -1,0 +1,131 @@
+PASS manifest valid (worldforge/0.1) — []
+PASS world adapted — grid=10x7 fixed=3 buildable=belt,smelter,assembler quests=3
+PASS only builtin assets (no GLB, no external URL)
+PASS save key
+PASS rejects wrong schema version — invalid world manifest: [{"code":"E_SCHEMA_VERSION","path":"schemaVersion","detail":"worldforge/9"}]
+PASS rejects another project's manifest — world manifest is for project "star-defense", expected "star-foundry"
+PASS rejects disabled rule — world manifest has no enabled "game.foundry" rule
+PASS rejects ragged grid — parseTileRows: all rows must have the same non-zero length
+PASS rejects unknown grid symbol — star-foundry: grid rows may only contain '.' and '#'
+PASS rejects zero beltTicks — star-foundry: beltTicks must be a positive integer
+PASS rejects negative cost — star-foundry: building "belt" cost must be a non-negative integer
+PASS rejects recipe with unknown item — star-foundry: smelter.recipe.inputs uses unknown item "mud"
+PASS rejects reserved building kind — star-foundry: building kind "depot" is reserved or duplicated
+PASS rejects source on a wall — star-foundry: fixed entity ent-ore-mine is not on a free grid cell
+PASS rejects source outside the grid — star-foundry: fixed entity ent-ore-mine is not on a free grid cell
+PASS rejects two fixed entities on one cell — star-foundry: two fixed entities share cell 0,3
+PASS rejects bad source direction — star-foundry: source ent-ore-mine has bad dir "north"
+PASS rejects world without a depot — star-foundry: the world needs at least one source and one depot
+PASS rejects world without orders — star-foundry: the world needs at least one order (quest)
+PASS rejects bank that cannot pay rewards — star-foundry: bankCoins cannot cover the order rewards
+PASS rejects duplicate entity id — invalid world manifest: [{"code":"E_DUPLICATE_ID","path":"entities[3].id","detail":"ent-ore-mine"}]
+PASS initial state
+PASS build costs coins and occupies the cell
+PASS build event is in the tick log
+PASS build on occupied cell refused
+PASS build on wall refused
+PASS build on source cell refused
+PASS build on depot cell refused
+PASS build out of bounds refused
+PASS build unknown kind refused
+PASS build bad direction refused
+PASS garbage build/remove payloads refused
+PASS remove empty / fixed / out of bounds refused
+PASS refused commands change nothing but the refusal counter — refused=20
+PASS canBuild / canRemove agree with the sim
+PASS coins boundary: 34 coins cannot buy a 30+5
+PASS unaffordable build refused, nothing charged
+PASS exactly enough coins is accepted
+PASS remove refunds part of the cost
+PASS coins are conserved through build/remove
+PASS source does not emit before its interval
+PASS source emits exactly at the interval tick
+PASS back-pressure: a full dead-end belt holds exactly one item
+PASS belt item waits until the belt tick
+PASS belt item advances one cell on the belt tick
+PASS line fills to capacity and stops (3 cells, 3 items)
+PASS head-first: the whole line shifts in one belt tick — ore@2,3 ore@3,3 ore@4,3
+PASS no two items share a cell
+PASS removing a loaded belt scraps the item (ledger)
+PASS merge setup: nothing emitted before tick 24
+PASS merge: ore and crystal emitted on the same tick, ore is older — [{"id":8,"kind":"ore","c":1,"r":3},{"id":9,"kind":"crystal","c":1,"r":4}]
+PASS merge tie-break: the older item (smaller id) takes the cell — crystal@1,4 ore@1,3
+PASS merge: the loser follows on the next belt tick — crystal@1,3 ore@2,3
+PASS closed belt loop fills up and stalls without losing items
+PASS machine idle with 1 of 2 inputs
+PASS recipe starts when the last input arrives
+PASS recipe not finished one tick early
+PASS recipe finishes exactly on time (inventory.craft)
+PASS buffer capacity boundary: output stops at outputCap, input at need*inputStacks — {"ore":4,"ingot":2}
+PASS blocked machine stalls the source (nothing lost) — produced=8
+PASS machine ejects onto a free belt
+PASS machine refuses a non-recipe item (crystal waits on the belt)
+PASS removing a loaded machine: buffer scrapped, ledger balanced, refund paid
+PASS depot refuses raw ore (line backs up, nothing delivered)
+PASS scripted factory completes every order and wins — phase=won tick=912 delivered={"ingot":3,"lamp":5} coins=242
+PASS item conservation held at every audit — audits=130
+PASS coin conservation held at every audit
+PASS state stayed valid during the run
+PASS final ledger balances per item — {"produced":0,"crafted":5,"consumed":0,"delivered":5,"scrapped":0,"onBelts":0,"inBuffers":0,"balanced":true}
+PASS coins = start - builds + refund + sales + rewards (each reward once) — coins=242 expected=242
+PASS quest stats expose deliveries
+PASS won game is frozen (inputs ignored, no production, no second reward)
+PASS summary for handoff/probe
+PASS still playing one tick before the deadline
+PASS idle play loses exactly at the deadline
+PASS lost game is frozen
+PASS restart gives the identical fresh state
+PASS orders finished on the deadline tick still win
+PASS one tick short of that loses
+PASS rewards are not paid again after save/restore of a finished game
+PASS finite bank: payments are skipped, coins never minted
+PASS determinism star-foundry: 12 seeds rerun identical
+PASS determinism star-foundry: 12 seeds replay identical
+PASS determinism star-foundry: 12 seeds save/restore mid-run identical
+PASS different seeds diverge (emission jitter uses the seeded RNG) — {"star-foundry-m6":"02462c74","foundry-a":"84c77e84","foundry-b":"bb5e048e","foundry-c":"2d3c854c","foundry-d":"907fccba","foundry-e":"02ba4628","foundry-f":"7692d12e","foundry-g":"a9fe97dc","foundry-h":"613000ef","foundry-i":"4e323e59","foundry-j":"f18b19bf","별-공방":"e5014365"}
+reference: seed=star-foundry-m6 frames=2400 hash=02462c74 phase=won rngDraws=41
+PASS pinned reference hash — hash=02462c74
+PASS reference run wins inside the script
+PASS the same commands in another order give a different hash
+PASS mid-production snapshot holds live belts, items and buffers
+PASS save star-foundry: round-trip accepted
+PASS save star-foundry: empty rejected
+PASS save star-foundry: truncated rejected
+PASS save star-foundry: tampered payload rejected
+PASS save star-foundry: unknown version rejected
+PASS save star-foundry: older version rejected
+PASS save star-foundry: other game's save rejected
+PASS save star-foundry: wrong format rejected
+PASS save star-foundry: legacy M3 save shape rejected
+PASS save star-foundry: re-signed but invalid state rejected
+PASS restored session shows the same factory
+PASS save/restore mid-production continues identically
+PASS save with minted coins refused
+PASS save with a forged delivery refused (ledger must balance)
+PASS save with a conjured belt item refused
+PASS save with a building on a wall refused
+PASS save with a broken cell index refused
+PASS save with an unknown phase refused
+PASS save with a missing fixed structure refused
+PASS another game's save text is refused
+PASS load: ~1000 entities, ledger balanced, one item per belt cell — entities=999 items=486
+PASS load run is deterministic
+PASS sim imports >= 3 shared core/next modules — ecs,spatial,inventory,quest,runtime,save,manifest
+PASS sim does not import M1–M3 sims or render code
+PASS page has module script games/star-foundry/index.html
+PASS syntax games/star-foundry/index.html script[0]
+PASS page uses the shared HUD kit, board and shell
+PASS page pins three 0.187.0 and uses the game's own save key
+PASS syntax games/star-foundry/foundry.js
+PASS syntax tools/check-star-foundry.mjs
+PASS syntax tools/next/play/star-foundry.mjs
+PASS syntax tools/next/play/star-foundry-stress.mjs
+PASS no Math.random in games/star-foundry/foundry.js
+PASS no Date.now in games/star-foundry/foundry.js
+PASS no performance.now in games/star-foundry/foundry.js
+PASS no new Date in games/star-foundry/foundry.js
+PASS no setTimeout in games/star-foundry/foundry.js
+PASS no setInterval in games/star-foundry/foundry.js
+PASS no fetch( in games/star-foundry/foundry.js
+PASS no localStorage in games/star-foundry/foundry.js
+ALL CHECKS PASSED (129)

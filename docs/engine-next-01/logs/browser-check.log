@@ -1,0 +1,28 @@
+engines: chromium=available firefox=NOT RUN (not installed) webkit=NOT RUN (not installed)
+browser: chromium 158.0.8127.36
+PASS chromium supuli desktop
+PASS chromium supuli phone-portrait
+PASS chromium supuli phone-landscape
+PASS chromium supuli narrow-portrait
+PASS chromium star-fishing desktop
+FAIL chromium star-fishing phone-portrait — caught a fish on the bite (0 caught, score 0, 4 attempts)
+PASS chromium star-fishing phone-landscape
+PASS chromium star-fishing narrow-portrait
+PASS chromium star-defense desktop
+PASS chromium star-defense phone-portrait
+FAIL chromium star-defense phone-landscape — placed 3 star towers by tapping build spots spot-1, spot-3, spot-5 (towers=2, stars=40) | towers, stars and cleared wave restored after reload (stars=105)
+PASS chromium star-defense narrow-portrait
+PASS chromium rune-vault desktop
+PASS chromium rune-vault phone-portrait
+PASS chromium rune-vault phone-landscape
+PASS chromium rune-vault narrow-portrait
+PASS chromium star-tactics desktop
+PASS chromium star-tactics phone-portrait
+PASS chromium star-tactics phone-landscape
+PASS chromium star-tactics narrow-portrait
+PASS chromium star-foundry desktop
+PASS chromium star-foundry phone-portrait
+PASS chromium star-foundry phone-landscape
+PASS chromium star-foundry narrow-portrait
+2 BROWSER RUN(S) FAILED of 24
+exit=1

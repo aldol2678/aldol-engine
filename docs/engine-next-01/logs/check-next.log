@@ -1,0 +1,263 @@
+PASS syntax src/core/next/ecs.js
+PASS syntax src/core/next/runtime.js
+PASS syntax src/core/next/spatial.js
+PASS syntax src/core/next/fsm.js
+PASS syntax src/core/next/inventory.js
+PASS syntax src/core/next/combat.js
+PASS syntax src/core/next/quest.js
+PASS syntax src/core/next/save.js
+PASS syntax src/core/next/manifest.js
+PASS syntax src/core/next/index.js
+PASS syntax tools/next/harness.mjs
+PASS no Math.random in src/core/next/ecs.js
+PASS no Date.now in src/core/next/ecs.js
+PASS no performance.now in src/core/next/ecs.js
+PASS no new Date in src/core/next/ecs.js
+PASS no setTimeout in src/core/next/ecs.js
+PASS no setInterval in src/core/next/ecs.js
+PASS no fetch( in src/core/next/ecs.js
+PASS no localStorage in src/core/next/ecs.js
+PASS no Math.random in src/core/next/runtime.js
+PASS no Date.now in src/core/next/runtime.js
+PASS no performance.now in src/core/next/runtime.js
+PASS no new Date in src/core/next/runtime.js
+PASS no setTimeout in src/core/next/runtime.js
+PASS no setInterval in src/core/next/runtime.js
+PASS no fetch( in src/core/next/runtime.js
+PASS no localStorage in src/core/next/runtime.js
+PASS no Math.random in src/core/next/spatial.js
+PASS no Date.now in src/core/next/spatial.js
+PASS no performance.now in src/core/next/spatial.js
+PASS no new Date in src/core/next/spatial.js
+PASS no setTimeout in src/core/next/spatial.js
+PASS no setInterval in src/core/next/spatial.js
+PASS no fetch( in src/core/next/spatial.js
+PASS no localStorage in src/core/next/spatial.js
+PASS no Math.random in src/core/next/fsm.js
+PASS no Date.now in src/core/next/fsm.js
+PASS no performance.now in src/core/next/fsm.js
+PASS no new Date in src/core/next/fsm.js
+PASS no setTimeout in src/core/next/fsm.js
+PASS no setInterval in src/core/next/fsm.js
+PASS no fetch( in src/core/next/fsm.js
+PASS no localStorage in src/core/next/fsm.js
+PASS no Math.random in src/core/next/inventory.js
+PASS no Date.now in src/core/next/inventory.js
+PASS no performance.now in src/core/next/inventory.js
+PASS no new Date in src/core/next/inventory.js
+PASS no setTimeout in src/core/next/inventory.js
+PASS no setInterval in src/core/next/inventory.js
+PASS no fetch( in src/core/next/inventory.js
+PASS no localStorage in src/core/next/inventory.js
+PASS no Math.random in src/core/next/combat.js
+PASS no Date.now in src/core/next/combat.js
+PASS no performance.now in src/core/next/combat.js
+PASS no new Date in src/core/next/combat.js
+PASS no setTimeout in src/core/next/combat.js
+PASS no setInterval in src/core/next/combat.js
+PASS no fetch( in src/core/next/combat.js
+PASS no localStorage in src/core/next/combat.js
+PASS no Math.random in src/core/next/quest.js
+PASS no Date.now in src/core/next/quest.js
+PASS no performance.now in src/core/next/quest.js
+PASS no new Date in src/core/next/quest.js
+PASS no setTimeout in src/core/next/quest.js
+PASS no setInterval in src/core/next/quest.js
+PASS no fetch( in src/core/next/quest.js
+PASS no localStorage in src/core/next/quest.js
+PASS no Math.random in src/core/next/save.js
+PASS no Date.now in src/core/next/save.js
+PASS no performance.now in src/core/next/save.js
+PASS no new Date in src/core/next/save.js
+PASS no setTimeout in src/core/next/save.js
+PASS no setInterval in src/core/next/save.js
+PASS no fetch( in src/core/next/save.js
+PASS no localStorage in src/core/next/save.js
+PASS no Math.random in src/core/next/manifest.js
+PASS no Date.now in src/core/next/manifest.js
+PASS no performance.now in src/core/next/manifest.js
+PASS no new Date in src/core/next/manifest.js
+PASS no setTimeout in src/core/next/manifest.js
+PASS no setInterval in src/core/next/manifest.js
+PASS no fetch( in src/core/next/manifest.js
+PASS no localStorage in src/core/next/manifest.js
+PASS no Math.random in src/core/next/index.js
+PASS no Date.now in src/core/next/index.js
+PASS no performance.now in src/core/next/index.js
+PASS no new Date in src/core/next/index.js
+PASS no setTimeout in src/core/next/index.js
+PASS no setInterval in src/core/next/index.js
+PASS no fetch( in src/core/next/index.js
+PASS no localStorage in src/core/next/index.js
+PASS syntax src/render/next/board.js
+PASS syntax src/render/next/shell.js
+PASS ecs ids are stable ascending integers
+PASS ecs defaults merged
+PASS ecs query is ascending and exact
+PASS ecs despawn removes entity and its components
+PASS ecs despawn of dead entity is a no-op
+PASS ecs ids are never reused
+PASS ecs unknown component rejected — ecs: unknown component "Nope"
+PASS ecs component validation rejects bad data — ecs: invalid "Pos": x/z must be numbers
+PASS ecs failed spawn is atomic (no id consumed)
+PASS ecs non-object component data rejected — ecs: component "Pos" data must be a plain object
+PASS ecs set on dead entity rejected — ecs: entity 1 is not alive
+PASS ecs bad component name rejected — ecs: bad component name "9bad"
+PASS ecs remove component
+PASS ecs copies component data on spawn
+PASS ecs each: despawned entity skipped, spawned entity not visited this pass — [1,2,4,5,6]
+PASS ecs find returns first match
+PASS ecs events delivered FIFO incl. nested emits — a1,b2,b2',a3,c4
+PASS ecs event log keeps seq order
+PASS ecs beginTick clears the event log
+PASS ecs event storm is cut off — ecs: event storm (handlers keep emitting)
+PASS ecs empty event type rejected — ecs: event type must be a non-empty string
+PASS ecs same operations give same hash — a757d7f9
+PASS ecs state round-trips through JSON
+PASS ecs rejects state with component on dead entity — ecs: invalid state: component Pos on dead entity 3
+PASS ecs rejects state with duplicate/unsorted ids — ecs: invalid state: alive id 2
+PASS ecs rejects state with unknown component store — ecs: invalid state: unknown component Ghost
+PASS ecs bind() retargets without copying
+PASS validateEcsState accepts fresh state
+PASS scheduler runs in (order, registration) order
+PASS scheduler rejects duplicate system name — scheduler: duplicate system "late"
+PASS scheduler rejects non-function — scheduler: system "x" needs a function
+PASS scheduler rejects NaN order — scheduler: system "y" order must be finite
+PASS TICK is 1/60
+PASS CountedRng matches shared Rng stream
+PASS CountedRng fast-forward resumes the stream
+PASS CountedRng counts int/pick/shuffle/float draws — draws=6
+PASS CountedRng fork is independent of the parent count
+PASS CountedRng rejects negative draws — CountedRng: draws must be a non-negative integer
+PASS normalizeInput drops non-objects
+PASS inputAt handles array / holes / pairs / Map / object
+PASS defineGame rejects bad id — defineGame: id must be kebab-case
+PASS defineGame rejects bad version — defineGame: version must be a positive integer
+PASS defineGame requires step — defineGame: createState and step are required
+PASS runtime same (seed, frames, inputs) -> same hash — 415fd882
+PASS runtime different seed -> different hash
+PASS runtime owns tick/seed/rngDraws
+PASS recorder stores only non-empty inputs + checkpoints
+PASS replay reproduces the final hash
+PASS replay detects a changed input at the first diverging checkpoint — 60
+PASS replay rejects other game / version / malformed record
+PASS restore continues to the same final hash
+PASS snapshot is isolated from the live session
+PASS restore rejects invalid state — counter: cannot restore: counter shape
+PASS restore rejects missing tick — counter: cannot restore: tick
+PASS inspect returns JSON status
+PASS grid bounds and blocked cells
+PASS grid rejects out-of-bounds blocked cell — createGrid: blocked cell out of bounds (2, 0)
+PASS grid rejects zero size — createGrid: cols/rows must be positive integers (max 1e6 cells)
+PASS findPath goes around the wall (shortest) — [{"c":2,"r":1},{"c":2,"r":2},{"c":2,"r":3},{"c":3,"r":3},{"c":4,"r":3},{"c":4,"r":2},{"c":4,"r":1},{"c":5,"r":1}]
+PASS findPath is deterministic
+PASS findPath tie-break follows DIRS4 order
+PASS findPath same cell is empty path
+PASS findPath to wall / out of bounds is null
+PASS findPath respects dynamic occupancy
+PASS findPath allowOccupiedGoal reaches an occupied goal
+PASS findPath maxCost boundary
+PASS floodFill respects maxCost and visit order — [[1,1,0],[2,1,1],[1,2,1],[2,2,2],[1,3,2]]
+PASS floodFill from outside is empty
+PASS lineOfSight blocked by wall, clear along the corridor
+PASS distance helpers
+PASS cell <-> world round-trip
+PASS circle overlap (touching is not overlap)
+PASS aabb overlap (touching is not overlap)
+PASS circle vs aabb
+PASS moveCircle slides along a wall — {"x":-1,"z":1.5,"hitX":true,"hitZ":false}
+PASS moveCircle moves freely when clear
+PASS spatial hash query is sorted by id — [1,2,5]
+PASS spatial hash query boundary and far items
+PASS spatial hash rejects duplicate id — spatial hash: duplicate id 5
+PASS spatial hash nearest: tie goes to the smaller id
+PASS spatial hash clear
+PASS spatial hash matches brute force on 1000 circles x 50 queries
+PASS gridNav implements NavProvider
+PASS navmeshNav reuses src/core/navmesh.js behind the same interface — points=4
+PASS fsm stays put when nothing matches
+PASS fsm boundary transition (dist == 5)
+PASS fsm one transition per update
+PASS fsm first matching transition wins (priority by order)
+PASS fsm ticksInState
+PASS fsm terminal state never leaves
+PASS fsm state is plain JSON
+PASS fsm rejects unknown target state — fsm x: a[0] goes to unknown state "zzz"
+PASS fsm rejects unknown initial state — fsm x: initial state "q" is not defined
+PASS fsm rejects transition without when() — fsm x: a[0] needs a when() function
+PASS fsm update on corrupted state throws — fsm guard: entity is in unknown state "ghost"
+PASS inventory initial counts
+PASS inventory add up to capacity boundary
+PASS inventory remove is all-or-nothing
+PASS inventory transfer conserves items
+PASS inventory transfer refused when target is full
+PASS inventory transfer refused when source lacks items
+PASS inventory rejects zero quantity — inventory: quantity must be a positive integer, got 0
+PASS inventory rejects negative quantity — inventory: quantity must be a positive integer, got -1
+PASS inventory rejects fractional quantity — inventory: quantity must be a positive integer, got 0.5
+PASS inventory rejects __proto__ item id — inventory: bad item id __proto__
+PASS inventory rejects over-capacity initial items — inventory: initial items exceed capacity
+PASS craft consumes inputs and produces outputs atomically
+PASS craft refused without inputs (nothing changes)
+PASS craft refused when outputs do not fit
+PASS trade swaps both sides
+PASS trade refused when a side cannot pay
+PASS trade conserves every item
+PASS trade refused when receiver has no room (nothing moves)
+PASS inventory validity check
+PASS empty stacks are deleted (canonical hash)
+PASS damage reduces hp
+PASS armor subtracts, minimum 1 damage
+PASS lethal damage clamps at 0 and reports overkill
+PASS dead target takes no more damage and cannot be healed
+PASS heal clamps at max
+PASS zero damage is a no-op
+PASS negative damage rejected — combat: damage must be a non-negative number
+PASS NaN damage rejected — combat: damage must be a non-negative number
+PASS bad max hp rejected — combat: max hp must be a positive integer
+PASS cooldown: ready, trigger, blocked until readyAt, boundary tick ready
+PASS cooldown rejects fractional duration — combat: cooldown duration must be a non-negative integer
+PASS rollDamage is seeded and bounded
+PASS rollDamage always consumes exactly two draws
+PASS quest progress tracks the first condition, capped at target
+PASS quest completes at the boundary and multi-condition quests need all
+PASS quest reward is granted exactly once
+PASS completed quests stay done when stats drop
+PASS done-but-unrewarded log pays once after load
+PASS quest log validity
+PASS duplicate quest id rejected — quests: duplicate quest id q-collect
+PASS quest without a condition rejected — quests: x has no condition node (params.stat)
+PASS quest with unknown op rejected — quests: x uses unknown op "~="
+PASS quest log / definition mismatch rejected — quests: log does not match definitions at q-collect
+PASS save round-trip
+PASS save rejects empty / non-string
+PASS save rejects corrupted JSON
+PASS save rejects non-envelope JSON
+PASS save rejects unknown (newer and older) versions
+PASS save is isolated per game
+PASS save rejects payload edits (checksum)
+PASS save rejects missing / array payload
+PASS save rejects __proto__ keys and does not pollute
+PASS save validator result is honoured
+PASS save rejects oversized text
+PASS save drops undefined fields before checksum
+PASS saveKey format matches the per-game key convention
+PASS saveKey rejects path-like ids — saveKey: bad game id, milestone or version
+PASS new save keys are distinct from each other and from M1–M3 keys
+PASS loadGameWorld adapts places/entities/config/quests
+PASS loaded world is deep-frozen (sims cannot mutate it)
+PASS loadGameWorld rejects an invalid manifest — invalid world manifest: [{"code":"E_SCHEMA_VERSION","path":"schemaVersion","detail":"worldforge/9.9"
+PASS loadGameWorld rejects a missing rule — world manifest has no enabled "game.other" rule
+PASS loadGameWorld rejects a disabled rule — world manifest has no enabled "game.demo" rule
+PASS loadGameWorld rejects another project's manifest — world manifest is for project "demo", expected "other"
+PASS loadGameWorld rejects duplicate entity ids — invalid world manifest: [{"code":"E_DUPLICATE_ID","path":"entities[2].id","detail":"crate-1"}]
+PASS loadGameWorld rejects a broken asset reference — invalid world manifest: [{"code":"E_ASSET_REF_NOT_FOUND","path":"entities[0].assetId","detail":"ghos
+PASS loadGameWorld rejects external asset URLs — invalid world manifest: [{"code":"E_ASSET_URI","path":"assets[0].uri","detail":"https://example.com/
+PASS loadGameWorld rejects parent-traversal GLB paths — invalid world manifest: [{"code":"E_ASSET_URI_UNSAFE","path":"assets[0].uri","detail":"glb:../x.glb"
+PASS parseTileRows walls and marks
+PASS parseTileRows rejects ragged rows — parseTileRows: all rows must have the same non-zero length
+PASS parseTileRows rejects empty input — parseTileRows: rows must be a non-empty array of strings
+PASS existing manifest still valid: supuli
+PASS existing manifest still valid: star-fishing
+PASS existing manifest still valid: star-defense
+ALL CHECKS PASSED (262)
