@@ -40,5 +40,6 @@ export async function play(page, ctx) {
   await ctx.shot("play");
   await ctx.reload();
   const after = await snap(page);
+  ctx.expect(after.assets.loaded.length === 2 && after.assets.failed.length === 0, "both GLB models loaded after reload (no fallback needed)");
   ctx.expect(after.score === end.score && after.caught === end.caught, `score and catch restored after reload (score ${after.score})`);
 }
