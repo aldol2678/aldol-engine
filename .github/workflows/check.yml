@@ -30,83 +30,70 @@ jobs:
         if: ${{ github.event_name == 'pull_request' && github.head_ref == 'feat/ark-engine-next-04' && hashFiles('tools/next/verify-combined-marginlife.sh') != '' }}
         timeout-minutes: 10
         run: bash tools/next/verify-combined-marginlife.sh "$RUNNER_TEMP/engine-next-evidence/combined"
-      # Bounded diagnostic only on this candidate. Preserve #9 evidence.
+      # One bounded diagnostic run on this candidate; retain #9/#10 artifacts.
       - name: Install focused browser verification tooling
         id: browser_install
-        if: ${{ !cancelled() && github.event_name == 'pull_request' && github.head_ref == 'feat/ark-engine-next-05' }}
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && github.head_ref == 'feat/ark-engine-next-06' }}
         timeout-minutes: 10
+        env:
+          NODE_PATH: ${{ runner.temp }}/engine-next-browser/node_modules
         run: |
           cat /etc/os-release
           npm install --prefix "$RUNNER_TEMP/engine-next-browser" --no-save --package-lock=false --ignore-scripts playwright@1.56.1 three@0.187.0
           "$RUNNER_TEMP/engine-next-browser/node_modules/.bin/playwright" install --with-deps chromium firefox
           command -v xvfb-run
           command -v xauth
-      - name: Compare WebGL2 and request failure controls
-        id: controls
-        if: ${{ !cancelled() && steps.browser_install.outcome == 'success' && github.event_name == 'pull_request' && github.head_ref == 'feat/ark-engine-next-05' }}
-        timeout-minutes: 5
-        env:
-          NODE_PATH: ${{ runner.temp }}/engine-next-browser/node_modules
-          THREE_BUILD_DIR: ${{ runner.temp }}/engine-next-browser/node_modules/three/build
-        run: xvfb-run -a node tools/next/browser-diagnostics.mjs "$RUNNER_TEMP/engine-next-05/controls"
-      - name: Recheck nine Firefox failures under selected control profile
-        if: ${{ !cancelled() && steps.browser_install.outcome == 'success' && github.event_name == 'pull_request' && github.head_ref == 'feat/ark-engine-next-05' }}
-        timeout-minutes: 20
+          node --check tools/next/save-lifecycle-check.mjs
+          node --check tools/next/glb-observer.mjs
+          node --check tools/next/browser-check.mjs
+      - name: Compare original and candidate save lifecycle in Firefox and Chromium
+        if: ${{ !cancelled() && steps.browser_install.outcome == 'success' && github.event_name == 'pull_request' && github.head_ref == 'feat/ark-engine-next-06' }}
+        timeout-minutes: 10
         env:
           NODE_PATH: ${{ runner.temp }}/engine-next-browser/node_modules
           THREE_BUILD_DIR: ${{ runner.temp }}/engine-next-browser/node_modules/three/build
         run: |
-          PROFILE="$(node -p 'require(process.env.RUNNER_TEMP+"/engine-next-05/controls/environment.json").selectedProfile || "NONE"')"
-          if [ "$PROFILE" = NONE ]; then
-            echo "HOLD: no unforced Firefox WebGL2 control profile passed; gameplay not run"
-            exit 1
-          fi
-          echo "Selected diagnostic profile: $PROFILE"
-          set +e
-          xvfb-run -a node tools/next/browser-check.mjs --engines firefox --firefox-profile "$PROFILE" --configs desktop --out "$RUNNER_TEMP/engine-next-05/firefox-desktop" --no-shots
-          desktop=$?
-          xvfb-run -a node tools/next/browser-check.mjs --engines firefox --firefox-profile "$PROFILE" --games rune-vault,star-tactics,star-foundry --configs phone-portrait --out "$RUNNER_TEMP/engine-next-05/firefox-touch" --no-shots
-          touch=$?
-          set -e
-          node --input-type=module -e '
-            import fs from "node:fs";import assert from "node:assert/strict";
-            const dir=process.env.RUNNER_TEMP+"/engine-next-05";
-            for(const [mode,games,config] of [["desktop",["supuli","star-fishing","star-defense","rune-vault","star-tactics","star-foundry"],"desktop"],["touch",["rune-vault","star-tactics","star-foundry"],"phone-portrait"]]){
-              const d=JSON.parse(fs.readFileSync(dir+"/firefox-"+mode+"/logs/browser-check.json","utf8"));
-              assert.equal(d.results.length,games.length);
-              for(const game of games)assert.equal(d.results.filter(x=>x.engine==="firefox"&&x.game===game&&x.config===config&&x.result==="PASS").length,1,game+"/"+config);
-            }'
-          test "$desktop" -eq 0 && test "$touch" -eq 0
-      - name: Reproduce Chromium fishing requests with original and settled reload timing
-        if: ${{ !cancelled() && steps.browser_install.outcome == 'success' && github.event_name == 'pull_request' && github.head_ref == 'feat/ark-engine-next-05' }}
+          git fetch --no-tags --depth=1 origin e17871761194c08b0c6f9921c802741aaa9b8a90
+          xvfb-run -a node tools/next/save-lifecycle-check.mjs "$RUNNER_TEMP/engine-next-06/lifecycle"
+      - name: Uninstrumented Supuli gameplay regression
+        if: ${{ !cancelled() && steps.browser_install.outcome == 'success' && github.event_name == 'pull_request' && github.head_ref == 'feat/ark-engine-next-06' }}
+        timeout-minutes: 5
+        env:
+          NODE_PATH: ${{ runner.temp }}/engine-next-browser/node_modules
+          THREE_BUILD_DIR: ${{ runner.temp }}/engine-next-browser/node_modules/three/build
+        run: |
+          xvfb-run -a node tools/next/browser-check.mjs --engines chromium,firefox --firefox-profile headed-software --games supuli --configs desktop --out "$RUNNER_TEMP/engine-next-06/supuli-regression" --no-shots
+      - name: Correlate native CDP and GLB decoder evidence
+        if: ${{ !cancelled() && steps.browser_install.outcome == 'success' && github.event_name == 'pull_request' && github.head_ref == 'feat/ark-engine-next-06' }}
         timeout-minutes: 15
         env:
           NODE_PATH: ${{ runner.temp }}/engine-next-browser/node_modules
           THREE_BUILD_DIR: ${{ runner.temp }}/engine-next-browser/node_modules/three/build
         run: |
           status=0
-          for n in 1 2 3; do
-            node tools/next/browser-check.mjs --engines chromium --games star-fishing --configs desktop --out "$RUNNER_TEMP/engine-next-05/chromium-original-$n" --no-shots || status=1
-          done
-          for n in 1 2 3; do
-            node tools/next/browser-check.mjs --engines chromium --games star-fishing --configs desktop --settle-glb --out "$RUNNER_TEMP/engine-next-05/chromium-settled-$n" --no-shots || status=1
+          for mode in chunked length; do
+            flags=()
+            if [ "$mode" = length ]; then flags+=(--glb-content-length); fi
+            for n in 1 2 3; do
+              node tools/next/browser-check.mjs --engines chromium --games star-fishing --configs desktop --glb-observe "${flags[@]}" --out "$RUNNER_TEMP/engine-next-06/glb-$mode-$n" --no-shots || status=1
+            done
           done
           node --input-type=module -e '
             import fs from "node:fs";import assert from "node:assert/strict";
-            const dir=process.env.RUNNER_TEMP+"/engine-next-05";
-            for(const mode of ["original","settled"])for(let n=1;n<=3;n++){
-              const d=JSON.parse(fs.readFileSync(dir+"/chromium-"+mode+"-"+n+"/logs/browser-check.json","utf8"));
+            const dir=process.env.RUNNER_TEMP+"/engine-next-06";
+            for(const mode of ["chunked","length"])for(let n=1;n<=3;n++){
+              const d=JSON.parse(fs.readFileSync(dir+"/glb-"+mode+"-"+n+"/logs/browser-check.json","utf8"));
               assert.equal(d.results.length,1);const r=d.results[0];
-              assert.equal(r.engine,"chromium");assert.equal(r.game,"star-fishing");assert.equal(r.config,"desktop");
-              console.log("FISHING_DIAGNOSTIC",JSON.stringify({mode,n,result:r.result,issues:r.issues,requestFailures:r.requestFailuresDuringTest,glbTrace:r.glbTrace,serverGlbTrace:r.serverGlbTrace}));
+              assert.equal(r.engine,"chromium");assert.equal(r.game,"star-fishing");
+              console.log("GLB_DIAGNOSTIC",JSON.stringify({mode,n,result:r.result,issues:r.issues,failures:r.requestFailuresDuringTest,decoded:r.glbEvidence?.decodedAllDocuments,correlated:r.glbEvidence?.correlatedAll,records:r.glbEvidence?.records.map(x=>({token:x.token,nav:x.nav,url:x.url,status:x.status,terminal:x.terminal,errorText:x.errorText,bodyMatches:x.bodyMatches,decoded:x.decodedInSameDocument,serverFinished:x.server?.finished,serverBytes:x.server?.bytesRead,bodyError:x.cdpBodyError}))}));
             }'
-          # No failed requests are waived, including intentional reload timing.
+          # Preserve strict raw network verdicts, including failed original controls.
           exit "$status"
-      - name: Preserve focused diagnostic evidence
-        if: ${{ always() && github.event_name == 'pull_request' && github.head_ref == 'feat/ark-engine-next-05' }}
+      - name: Preserve lifecycle and native network evidence
+        if: ${{ always() && github.event_name == 'pull_request' && github.head_ref == 'feat/ark-engine-next-06' }}
         uses: actions/upload-artifact@v4
         with:
-          name: engine-next-05-browser-evidence
-          path: ${{ runner.temp }}/engine-next-05/
+          name: engine-next-06-lifecycle-network-evidence
+          path: ${{ runner.temp }}/engine-next-06/
           if-no-files-found: warn
           retention-days: 7
