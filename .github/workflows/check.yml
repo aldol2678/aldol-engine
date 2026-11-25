@@ -12,7 +12,7 @@ on:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Show toolchain
@@ -26,16 +26,22 @@ jobs:
       - name: Stress RNG save restoration when present
         if: ${{ hashFiles('tools/next/rng-restore-stress.mjs') != '' }}
         run: node tools/next/rng-restore-stress.mjs
+      - name: Verify actual MarginLife P3 combined source tree
+        if: ${{ github.event_name == 'pull_request' && github.head_ref == 'feat/ark-engine-next-04' && hashFiles('tools/next/verify-combined-marginlife.sh') != '' }}
+        timeout-minutes: 10
+        run: bash tools/next/verify-combined-marginlife.sh "$RUNNER_TEMP/engine-next-evidence/combined"
       # Bounded one-time integration evidence; no extra job or deploy.
       # Routine PRs retain only the existing and conditional headless checks.
       - name: Install cross-browser verification tooling
-        if: ${{ github.event_name == 'pull_request' && github.head_ref == 'feat/ark-engine-next-02' && hashFiles('tools/next/browser-check.mjs') != '' }}
+        id: browser_install
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && github.head_ref == 'feat/ark-engine-next-04' && hashFiles('tools/next/browser-check.mjs') != '' }}
         timeout-minutes: 10
         run: |
+          cat /etc/os-release
           npm install --prefix "$RUNNER_TEMP/engine-next-browser" --no-save --package-lock=false --ignore-scripts playwright@1.56.1 three@0.187.0
           "$RUNNER_TEMP/engine-next-browser/node_modules/.bin/playwright" install --with-deps chromium firefox webkit
       - name: Cross-browser gameplay evidence (desktop and new-game touch)
-        if: ${{ github.event_name == 'pull_request' && github.head_ref == 'feat/ark-engine-next-02' && hashFiles('tools/next/browser-check.mjs') != '' }}
+        if: ${{ !cancelled() && steps.browser_install.outcome == 'success' && github.event_name == 'pull_request' && github.head_ref == 'feat/ark-engine-next-04' && hashFiles('tools/next/browser-check.mjs') != '' }}
         timeout-minutes: 30
         env:
           NODE_PATH: ${{ runner.temp }}/engine-next-browser/node_modules
@@ -63,10 +69,10 @@ jobs:
           }'
           test "$desktop" -eq 0 && test "$touch" -eq 0
       - name: Preserve cross-browser evidence
-        if: ${{ always() && github.event_name == 'pull_request' && github.head_ref == 'feat/ark-engine-next-02' }}
+        if: ${{ always() && github.event_name == 'pull_request' && github.head_ref == 'feat/ark-engine-next-04' }}
         uses: actions/upload-artifact@v4
         with:
-          name: engine-next-02-cross-browser
+          name: engine-next-04-integration-evidence
           path: ${{ runner.temp }}/engine-next-evidence/
           if-no-files-found: warn
           retention-days: 7
