@@ -1,0 +1,987 @@
+{
+  "schemaVersion": "worldforge/0.1",
+  "project": {
+    "id": "star-tactics",
+    "name": "별빛 전술"
+  },
+  "world": {
+    "id": "star-tactics-field",
+    "name": "별빛 전장",
+    "version": "0.1.0",
+    "description": "M5 후보 — 턴제 전술. 별빛 분대 3명으로 그림자 무리를 물리친다."
+  },
+  "assets": [
+    {
+      "id": "unit-guard",
+      "type": "model",
+      "uri": "builtin:unit-guard"
+    },
+    {
+      "id": "unit-archer",
+      "type": "model",
+      "uri": "builtin:unit-archer"
+    },
+    {
+      "id": "unit-mender",
+      "type": "model",
+      "uri": "builtin:unit-mender"
+    },
+    {
+      "id": "unit-wisp",
+      "type": "model",
+      "uri": "builtin:unit-wisp"
+    },
+    {
+      "id": "unit-hexer",
+      "type": "model",
+      "uri": "builtin:unit-hexer"
+    },
+    {
+      "id": "unit-brute",
+      "type": "model",
+      "uri": "builtin:unit-brute"
+    }
+  ],
+  "zones": [
+    {
+      "id": "battlefield",
+      "name": "별빛 전장",
+      "type": "zone.field",
+      "geometry": {
+        "type": "polygon",
+        "space": "local",
+        "points": [
+          [
+            0,
+            0
+          ],
+          [
+            8,
+            0
+          ],
+          [
+            8,
+            6
+          ],
+          [
+            0,
+            6
+          ]
+        ]
+      }
+    }
+  ],
+  "places": [
+    {
+      "id": "spawn",
+      "name": "분대 집결지",
+      "type": "place.spawn",
+      "zoneId": "battlefield",
+      "position": [
+        0,
+        0,
+        2
+      ]
+    },
+    {
+      "id": "enemy-gate",
+      "name": "그림자 문",
+      "type": "place.gate",
+      "zoneId": "battlefield",
+      "position": [
+        7,
+        0,
+        2
+      ]
+    }
+  ],
+  "paths": [],
+  "entities": [
+    {
+      "id": "m1-guard",
+      "name": "수호병 하늘",
+      "type": "entity.unit",
+      "assetId": "unit-guard",
+      "enabled": true,
+      "parentId": null,
+      "tags": [
+        "player",
+        "mission-1"
+      ],
+      "transform": {
+        "position": [
+          1,
+          0,
+          2
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": {
+        "game.unit": {
+          "mission": "mission-1",
+          "team": "player",
+          "class": "guard"
+        }
+      }
+    },
+    {
+      "id": "m1-archer",
+      "name": "궁수 나래",
+      "type": "entity.unit",
+      "assetId": "unit-archer",
+      "enabled": true,
+      "parentId": null,
+      "tags": [
+        "player",
+        "mission-1"
+      ],
+      "transform": {
+        "position": [
+          0,
+          0,
+          3
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": {
+        "game.unit": {
+          "mission": "mission-1",
+          "team": "player",
+          "class": "archer"
+        }
+      }
+    },
+    {
+      "id": "m1-mender",
+      "name": "치유사 다솜",
+      "type": "entity.unit",
+      "assetId": "unit-mender",
+      "enabled": true,
+      "parentId": null,
+      "tags": [
+        "player",
+        "mission-1"
+      ],
+      "transform": {
+        "position": [
+          0,
+          0,
+          1
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": {
+        "game.unit": {
+          "mission": "mission-1",
+          "team": "player",
+          "class": "mender"
+        }
+      }
+    },
+    {
+      "id": "m1-wisp-a",
+      "name": "도깨비불 가",
+      "type": "entity.unit",
+      "assetId": "unit-wisp",
+      "enabled": true,
+      "parentId": null,
+      "tags": [
+        "enemy",
+        "mission-1"
+      ],
+      "transform": {
+        "position": [
+          6,
+          0,
+          1
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": {
+        "game.unit": {
+          "mission": "mission-1",
+          "team": "enemy",
+          "class": "wisp"
+        }
+      }
+    },
+    {
+      "id": "m1-wisp-b",
+      "name": "도깨비불 나",
+      "type": "entity.unit",
+      "assetId": "unit-wisp",
+      "enabled": true,
+      "parentId": null,
+      "tags": [
+        "enemy",
+        "mission-1"
+      ],
+      "transform": {
+        "position": [
+          7,
+          0,
+          4
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": {
+        "game.unit": {
+          "mission": "mission-1",
+          "team": "enemy",
+          "class": "wisp"
+        }
+      }
+    },
+    {
+      "id": "m1-wisp-c",
+      "name": "도깨비불 다",
+      "type": "entity.unit",
+      "assetId": "unit-wisp",
+      "enabled": true,
+      "parentId": null,
+      "tags": [
+        "enemy",
+        "mission-1"
+      ],
+      "transform": {
+        "position": [
+          5,
+          0,
+          5
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": {
+        "game.unit": {
+          "mission": "mission-1",
+          "team": "enemy",
+          "class": "wisp"
+        }
+      }
+    },
+    {
+      "id": "m1-hexer",
+      "name": "저주술사 가",
+      "type": "entity.unit",
+      "assetId": "unit-hexer",
+      "enabled": true,
+      "parentId": null,
+      "tags": [
+        "enemy",
+        "mission-1"
+      ],
+      "transform": {
+        "position": [
+          7,
+          0,
+          2
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": {
+        "game.unit": {
+          "mission": "mission-1",
+          "team": "enemy",
+          "class": "hexer"
+        }
+      }
+    },
+    {
+      "id": "m2-guard",
+      "name": "수호병 하늘",
+      "type": "entity.unit",
+      "assetId": "unit-guard",
+      "enabled": true,
+      "parentId": null,
+      "tags": [
+        "player",
+        "mission-2"
+      ],
+      "transform": {
+        "position": [
+          1,
+          0,
+          2
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": {
+        "game.unit": {
+          "mission": "mission-2",
+          "team": "player",
+          "class": "guard"
+        }
+      }
+    },
+    {
+      "id": "m2-archer",
+      "name": "궁수 나래",
+      "type": "entity.unit",
+      "assetId": "unit-archer",
+      "enabled": true,
+      "parentId": null,
+      "tags": [
+        "player",
+        "mission-2"
+      ],
+      "transform": {
+        "position": [
+          0,
+          0,
+          3
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": {
+        "game.unit": {
+          "mission": "mission-2",
+          "team": "player",
+          "class": "archer"
+        }
+      }
+    },
+    {
+      "id": "m2-mender",
+      "name": "치유사 다솜",
+      "type": "entity.unit",
+      "assetId": "unit-mender",
+      "enabled": true,
+      "parentId": null,
+      "tags": [
+        "player",
+        "mission-2"
+      ],
+      "transform": {
+        "position": [
+          0,
+          0,
+          1
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": {
+        "game.unit": {
+          "mission": "mission-2",
+          "team": "player",
+          "class": "mender"
+        }
+      }
+    },
+    {
+      "id": "m2-wisp-a",
+      "name": "도깨비불 가",
+      "type": "entity.unit",
+      "assetId": "unit-wisp",
+      "enabled": true,
+      "parentId": null,
+      "tags": [
+        "enemy",
+        "mission-2"
+      ],
+      "transform": {
+        "position": [
+          6,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": {
+        "game.unit": {
+          "mission": "mission-2",
+          "team": "enemy",
+          "class": "wisp"
+        }
+      }
+    },
+    {
+      "id": "m2-wisp-b",
+      "name": "도깨비불 나",
+      "type": "entity.unit",
+      "assetId": "unit-wisp",
+      "enabled": true,
+      "parentId": null,
+      "tags": [
+        "enemy",
+        "mission-2"
+      ],
+      "transform": {
+        "position": [
+          5,
+          0,
+          5
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": {
+        "game.unit": {
+          "mission": "mission-2",
+          "team": "enemy",
+          "class": "wisp"
+        }
+      }
+    },
+    {
+      "id": "m2-hexer-a",
+      "name": "저주술사 가",
+      "type": "entity.unit",
+      "assetId": "unit-hexer",
+      "enabled": true,
+      "parentId": null,
+      "tags": [
+        "enemy",
+        "mission-2"
+      ],
+      "transform": {
+        "position": [
+          7,
+          0,
+          1
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": {
+        "game.unit": {
+          "mission": "mission-2",
+          "team": "enemy",
+          "class": "hexer"
+        }
+      }
+    },
+    {
+      "id": "m2-hexer-b",
+      "name": "저주술사 나",
+      "type": "entity.unit",
+      "assetId": "unit-hexer",
+      "enabled": true,
+      "parentId": null,
+      "tags": [
+        "enemy",
+        "mission-2"
+      ],
+      "transform": {
+        "position": [
+          7,
+          0,
+          4
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": {
+        "game.unit": {
+          "mission": "mission-2",
+          "team": "enemy",
+          "class": "hexer"
+        }
+      }
+    },
+    {
+      "id": "m2-brute",
+      "name": "그림자 거인",
+      "type": "entity.unit",
+      "assetId": "unit-brute",
+      "enabled": true,
+      "parentId": null,
+      "tags": [
+        "enemy",
+        "mission-2"
+      ],
+      "transform": {
+        "position": [
+          7,
+          0,
+          2
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": {
+        "game.unit": {
+          "mission": "mission-2",
+          "team": "enemy",
+          "class": "brute"
+        }
+      }
+    }
+  ],
+  "npcs": [],
+  "events": [],
+  "quests": [
+    {
+      "id": "first-blood",
+      "name": "첫 적 물리치기",
+      "type": "quest.defeat",
+      "nodes": [
+        {
+          "id": "start",
+          "type": "quest.start"
+        },
+        {
+          "id": "goal",
+          "type": "quest.condition",
+          "params": {
+            "stat": "defeated",
+            "op": ">=",
+            "value": 1
+          }
+        },
+        {
+          "id": "done",
+          "type": "quest.complete",
+          "params": {
+            "reward": {
+              "stars": 1
+            }
+          }
+        }
+      ],
+      "edges": [
+        {
+          "from": "start",
+          "to": "goal"
+        },
+        {
+          "from": "goal",
+          "to": "done"
+        }
+      ]
+    },
+    {
+      "id": "heal-ally",
+      "name": "동료를 6 이상 치유하기",
+      "type": "quest.heal",
+      "nodes": [
+        {
+          "id": "start",
+          "type": "quest.start"
+        },
+        {
+          "id": "goal",
+          "type": "quest.condition",
+          "params": {
+            "stat": "healed",
+            "op": ">=",
+            "value": 6
+          }
+        },
+        {
+          "id": "done",
+          "type": "quest.complete",
+          "params": {
+            "reward": {
+              "stars": 1
+            }
+          }
+        }
+      ],
+      "edges": [
+        {
+          "from": "start",
+          "to": "goal"
+        },
+        {
+          "from": "goal",
+          "to": "done"
+        }
+      ]
+    },
+    {
+      "id": "clear-mission-1",
+      "name": "임무 1: 숲 가장자리 지키기",
+      "type": "quest.mission",
+      "nodes": [
+        {
+          "id": "start",
+          "type": "quest.start"
+        },
+        {
+          "id": "goal",
+          "type": "quest.condition",
+          "params": {
+            "stat": "missionsCleared",
+            "op": ">=",
+            "value": 1
+          }
+        },
+        {
+          "id": "done",
+          "type": "quest.complete",
+          "params": {
+            "reward": {
+              "stars": 2
+            }
+          }
+        }
+      ],
+      "edges": [
+        {
+          "from": "start",
+          "to": "goal"
+        },
+        {
+          "from": "goal",
+          "to": "done"
+        }
+      ]
+    },
+    {
+      "id": "clear-mission-2",
+      "name": "임무 2: 그림자 거인 물리치기",
+      "type": "quest.mission",
+      "nodes": [
+        {
+          "id": "start",
+          "type": "quest.start"
+        },
+        {
+          "id": "goal",
+          "type": "quest.condition",
+          "params": {
+            "stat": "missionsCleared",
+            "op": ">=",
+            "value": 2
+          }
+        },
+        {
+          "id": "done",
+          "type": "quest.complete",
+          "params": {
+            "reward": {
+              "stars": 3
+            }
+          }
+        }
+      ],
+      "edges": [
+        {
+          "from": "start",
+          "to": "goal"
+        },
+        {
+          "from": "goal",
+          "to": "done"
+        }
+      ]
+    }
+  ],
+  "rules": [
+    {
+      "id": "rule-tactics",
+      "name": "별빛 전술 규칙",
+      "type": "game.tactics",
+      "enabled": true,
+      "config": {
+        "enemyActionTicks": 6,
+        "phaseDelayTicks": 12,
+        "ai": {
+          "alertTurn": 3,
+          "retreatHpRatio": 0.5
+        },
+        "classes": {
+          "guard": {
+            "name": "수호병",
+            "hp": 16,
+            "ap": 4,
+            "armor": 1,
+            "attack": {
+              "name": "베기",
+              "range": 1,
+              "base": 5,
+              "variance": 1,
+              "critChance": 0.1,
+              "cost": 2,
+              "los": false
+            },
+            "skill": {
+              "kind": "strike",
+              "name": "방패 강타",
+              "range": 1,
+              "base": 9,
+              "variance": 1,
+              "critChance": 0,
+              "cost": 3,
+              "cooldownTurns": 3,
+              "los": false
+            }
+          },
+          "archer": {
+            "name": "궁수",
+            "hp": 10,
+            "ap": 4,
+            "armor": 0,
+            "attack": {
+              "name": "사격",
+              "range": 4,
+              "base": 4,
+              "variance": 1,
+              "critChance": 0.15,
+              "cost": 2,
+              "los": true
+            },
+            "skill": {
+              "kind": "strike",
+              "name": "조준 사격",
+              "range": 5,
+              "base": 8,
+              "variance": 1,
+              "critChance": 0,
+              "cost": 3,
+              "cooldownTurns": 3,
+              "los": true
+            }
+          },
+          "mender": {
+            "name": "치유사",
+            "hp": 10,
+            "ap": 4,
+            "armor": 0,
+            "attack": {
+              "name": "지팡이",
+              "range": 1,
+              "base": 2,
+              "variance": 0,
+              "critChance": 0,
+              "cost": 2,
+              "los": false
+            },
+            "skill": {
+              "kind": "heal",
+              "name": "별빛 치유",
+              "range": 3,
+              "amount": 6,
+              "cost": 2,
+              "cooldownTurns": 2,
+              "los": false
+            }
+          },
+          "wisp": {
+            "name": "그림자 도깨비불",
+            "hp": 8,
+            "ap": 3,
+            "armor": 0,
+            "sight": 5,
+            "retreats": false,
+            "attack": {
+              "name": "할퀴기",
+              "range": 1,
+              "base": 3,
+              "variance": 1,
+              "critChance": 0.05,
+              "cost": 2,
+              "los": false
+            }
+          },
+          "hexer": {
+            "name": "저주술사",
+            "hp": 6,
+            "ap": 3,
+            "armor": 0,
+            "sight": 7,
+            "retreats": true,
+            "attack": {
+              "name": "저주",
+              "range": 3,
+              "base": 3,
+              "variance": 1,
+              "critChance": 0.05,
+              "cost": 2,
+              "los": true
+            }
+          },
+          "brute": {
+            "name": "그림자 거인",
+            "hp": 16,
+            "ap": 3,
+            "armor": 1,
+            "sight": 99,
+            "retreats": false,
+            "attack": {
+              "name": "내려찍기",
+              "range": 1,
+              "base": 6,
+              "variance": 1,
+              "critChance": 0.05,
+              "cost": 2,
+              "los": false
+            }
+          }
+        },
+        "missions": [
+          {
+            "id": "mission-1",
+            "name": "임무 1 · 숲 가장자리",
+            "rows": [
+              "........",
+              "..#.....",
+              "..#...#.",
+              ".....##.",
+              ".#......",
+              "........"
+            ]
+          },
+          {
+            "id": "mission-2",
+            "name": "임무 2 · 그림자 거인",
+            "rows": [
+              "...#....",
+              "...#..#.",
+              "........",
+              ".#....#.",
+              ".#..#...",
+              "........"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

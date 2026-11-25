@@ -1,0 +1,135 @@
+{
+  "tool": "tools/next/bench.mjs",
+  "root": "/tmp/aldol-baseline",
+  "node": "v22.23.5",
+  "platform": "linux x64",
+  "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+  "cpus": 4,
+  "reps": 3,
+  "gcExposed": true,
+  "rows": [
+    {
+      "name": "existing/supuli step {dx:1}",
+      "median_p50_us": 25.89,
+      "median_p95_us": 60.38,
+      "median_mean_us": 38.37,
+      "runs": [
+        {
+          "rep": 1,
+          "ticks": 3000,
+          "p50_us": 29.01,
+          "p95_us": 63.92,
+          "p99_us": 329.57,
+          "mean_us": 39,
+          "max_us": 946.56,
+          "heapUsed_mb": 5.98,
+          "heapDelta_mb": 1.67
+        },
+        {
+          "rep": 2,
+          "ticks": 3000,
+          "p50_us": 25.89,
+          "p95_us": 60.38,
+          "p99_us": 336.02,
+          "mean_us": 38.37,
+          "max_us": 1582.93,
+          "heapUsed_mb": 6.3,
+          "heapDelta_mb": 1.93
+        },
+        {
+          "rep": 3,
+          "ticks": 3000,
+          "p50_us": 25.16,
+          "p95_us": 43.31,
+          "p99_us": 95.79,
+          "mean_us": 27.94,
+          "max_us": 508.48,
+          "heapUsed_mb": 5.97,
+          "heapDelta_mb": 1.51
+        }
+      ]
+    },
+    {
+      "name": "existing/star-fishing step (walk + cast)",
+      "median_p50_us": 13.93,
+      "median_p95_us": 21.29,
+      "median_mean_us": 16.17,
+      "runs": [
+        {
+          "rep": 1,
+          "ticks": 3000,
+          "p50_us": 13.93,
+          "p95_us": 21.61,
+          "p99_us": 65.6,
+          "mean_us": 16.17,
+          "max_us": 285.33,
+          "heapUsed_mb": 6.02,
+          "heapDelta_mb": 1.44
+        },
+        {
+          "rep": 2,
+          "ticks": 3000,
+          "p50_us": 14.17,
+          "p95_us": 21.29,
+          "p99_us": 48.86,
+          "mean_us": 16.7,
+          "max_us": 1363.64,
+          "heapUsed_mb": 5.05,
+          "heapDelta_mb": 0.44
+        },
+        {
+          "rep": 3,
+          "ticks": 3000,
+          "p50_us": 13.91,
+          "p95_us": 19.72,
+          "p99_us": 50.35,
+          "mean_us": 15.27,
+          "max_us": 420.1,
+          "heapUsed_mb": 6.77,
+          "heapDelta_mb": 2.1
+        }
+      ]
+    },
+    {
+      "name": "existing/star-defense step (3 towers, waves)",
+      "median_p50_us": 23.66,
+      "median_p95_us": 35.04,
+      "median_mean_us": 25.9,
+      "runs": [
+        {
+          "rep": 1,
+          "ticks": 3000,
+          "p50_us": 24.98,
+          "p95_us": 45.77,
+          "p99_us": 82.62,
+          "mean_us": 32.07,
+          "max_us": 8213.72,
+          "heapUsed_mb": 5.08,
+          "heapDelta_mb": 0.32
+        },
+        {
+          "rep": 2,
+          "ticks": 3000,
+          "p50_us": 23.66,
+          "p95_us": 35.04,
+          "p99_us": 59.02,
+          "mean_us": 25.9,
+          "max_us": 484.4,
+          "heapUsed_mb": 7.2,
+          "heapDelta_mb": 2.42
+        },
+        {
+          "rep": 3,
+          "ticks": 3000,
+          "p50_us": 22.55,
+          "p95_us": 34.8,
+          "p99_us": 64.8,
+          "mean_us": 25.23,
+          "max_us": 1111.01,
+          "heapUsed_mb": 5.43,
+          "heapDelta_mb": 0.59
+        }
+      ]
+    }
+  ]
+}
