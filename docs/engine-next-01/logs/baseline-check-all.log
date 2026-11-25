@@ -1,0 +1,157 @@
+
+> aldol-engine@0.1.0 check:all
+> npm run check && npm run check:fishing && npm run check:star-defense
+
+
+> aldol-engine@0.1.0 check
+> node tools/check.mjs
+
+PASS world manifest valid
+PASS world adapted — wp=12 houses=5 trees=7 shards=5 crops=3 herbs=3 npcs=5 quests=9 maxX=24 minY=-8
+PASS world manifest rejects bad npc ref
+PASS syntax src/core/assets.js
+PASS syntax src/core/audio.js
+PASS syntax src/core/navmesh.js
+PASS syntax src/core/rng.js
+PASS syntax src/core/sim.js
+PASS syntax src/core/state-hash.js
+PASS syntax src/core/worldforge.js
+PASS syntax src/render/asset-loader.js
+PASS syntax src/render/audio.js
+PASS syntax src/render/hud.js
+PASS syntax src/render/sim-loader.js
+PASS syntax src/render/vendor/BufferGeometryUtils.js
+PASS syntax src/render/vendor/GLTFLoader.js
+PASS syntax src/render/vendor/SkeletonUtils.js
+PASS syntax src/simulate-cli.mjs
+PASS syntax src/wasm/aldol_sim.js
+PASS syntax tools/check.mjs
+PASS determinism same-seed — hash=754a144e
+PASS determinism different-seed — a=754a144e c=53dfa8f0
+PASS player moves east — x=6.00
+PASS npc leaves patrol or chases — npc=approach
+PASS A* path exists 0->2 — path=[0,11,2]
+PASS navmesh built — cols=60 rows=32 cell=0.5
+PASS house center is blocked — house=(-4, -1)
+PASS spawn is walkable
+PASS direct line through a house is blocked
+PASS navmesh path detours around a house — points=4 len=5.95
+PASS navmesh path is deterministic
+PASS npc chases around a house and reaches the player — boar=(-2.49, -0.15)
+PASS npc never enters a blocked cell
+PASS quest talk-to-villager completes
+PASS quest does not complete without interact
+PASS quest collect-shards completes — progress=5
+PASS quest reach-forest-gate completes — player=(10.5, 2.6)
+PASS quest reach-deep-forest completes — player=(12.0, 1.8)
+PASS quest talk-to-elder completes
+PASS quest harvest-crops completes — progress=3
+PASS quest reach-farm completes — player=(0.0, -4.7)
+PASS herb heals on pickup — hp=80 consumed=true
+PASS quest defeat-boar completes — boar hp=0
+PASS defeated npc respawns at home — boar hp=60 state=patrol
+PASS combat-lite contact damage — hp=20
+PASS default world talk quest completes
+PASS audio voices defined
+PASS audio catch voice ascends
+PASS audio unknown voice is empty
+PASS audio schedule offsets by when
+PASS audio bgm has 4 chords
+PASS no Math.random in src/core/assets.js
+PASS no Date.now in src/core/assets.js
+PASS no performance.now in src/core/assets.js
+PASS no Math.random in src/core/audio.js
+PASS no Date.now in src/core/audio.js
+PASS no performance.now in src/core/audio.js
+PASS no Math.random in src/core/navmesh.js
+PASS no Date.now in src/core/navmesh.js
+PASS no performance.now in src/core/navmesh.js
+PASS no Math.random in src/core/rng.js
+PASS no Date.now in src/core/rng.js
+PASS no performance.now in src/core/rng.js
+PASS no Math.random in src/core/sim.js
+PASS no Date.now in src/core/sim.js
+PASS no performance.now in src/core/sim.js
+PASS no Math.random in src/core/state-hash.js
+PASS no Date.now in src/core/state-hash.js
+PASS no performance.now in src/core/state-hash.js
+PASS no Math.random in src/core/worldforge.js
+PASS no Date.now in src/core/worldforge.js
+PASS no performance.now in src/core/worldforge.js
+ALL CHECKS PASSED
+
+> aldol-engine@0.1.0 check:fishing
+> node --experimental-vm-modules tools/check-fishing.mjs
+
+PASS fishing manifest valid — []
+PASS fishing world adapted — wp=8 npcs=6 quests=3 bounds={"minX":-6,"maxX":10,"minY":-8,"maxY":8} reeds=6
+PASS fishing manifest rejects bad npc ref
+PASS fishing world has trophies + glb npc asset — trophies=1 fish-5 asset=star-fish
+PASS manifest rejects parent-traversal glb uri
+PASS manifest rejects external glb uri
+PASS supuli manifest still valid under asset-uri rule
+PASS glbAssets lists 2
+PASS isSafeGlbUri cases
+PASS glb valid assets/models/star-fish.glb — 67928 bytes
+PASS glb valid assets/models/star-trophy.glb — 2872 bytes
+PASS syntax games/star-fishing/fishing.js
+PASS syntax src/core/worldforge.js
+PASS syntax src/render/asset-loader.js
+PASS syntax src/render/hud.js
+PASS syntax src/render/vendor/GLTFLoader.js
+PASS syntax src/render/vendor/BufferGeometryUtils.js
+PASS syntax src/render/vendor/SkeletonUtils.js
+PASS determinism same-seed — hash=7eb7f2df
+PASS determinism different-seed — a=7eb7f2df c=3c3b4ea3
+PASS player blocked from water — player=(-6.0, 0.0)
+PASS quest talk-to-angler completes
+PASS quest reach-dock-end completes — player=(0.0, -4.5)
+PASS cast off-dock does nothing
+PASS cast -> bite -> reel catches a fish — reason=ok score=10 caught=1
+PASS early reel scares the fish — phase=cooldown biter=flee
+PASS quest catch-star-fish completes — caught=3 score=70
+PASS caught fish respawns — fish=fish-1 state=swim
+PASS no Math.random in games/star-fishing/fishing.js
+PASS no Date.now in games/star-fishing/fishing.js
+PASS no performance.now in games/star-fishing/fishing.js
+ALL CHECKS PASSED
+
+> aldol-engine@0.1.0 check:star-defense
+> node --experimental-vm-modules tools/check-star-defense.mjs
+
+PASS defense manifest valid — []
+PASS defense world adapted — wp=7 quests=3 bounds={"minX":-9,"maxX":9,"minY":-6,"maxY":6} waves=5 trophies=1
+PASS defense manifest rejects bad path ref
+PASS manifest rejects parent-traversal glb uri
+PASS fishing manifest still valid under defense rule
+PASS glbAssets lists 1
+PASS isSafeGlbUri cases
+PASS glb valid assets/models/star-trophy.glb — 2872 bytes
+PASS syntax games/star-defense/defense.js
+PASS syntax src/core/worldforge.js
+PASS syntax src/render/asset-loader.js
+PASS syntax src/render/hud.js
+PASS syntax src/render/vendor/GLTFLoader.js
+PASS syntax src/render/vendor/BufferGeometryUtils.js
+PASS syntax src/render/vendor/SkeletonUtils.js
+PASS determinism same-seed — hash=0d316768
+PASS determinism different-seed — a=0d316768 c=b7246d9a
+PASS createInitialState rejects bad path waypoint
+PASS place tower costs stars — towers=1 stars=70
+PASS place on occupied spot rejected
+PASS unaffordable tower rejected
+PASS place on unknown spot rejected
+PASS start wave builds queue — phase=combat wave=1 queue=5
+PASS enemies spawn and walk — enemies=5 first=(0.2, 3.0)
+PASS towers kill wave 1 and it clears — kills=5 phase=build cleared=1 shrine=10 stars=75
+PASS stars after wave 1 — stars=75
+PASS quest clear-wave-1 completes
+PASS quest place-first-tower completes
+PASS leaks damage the shrine — shrine=5 phase=build kills=0
+PASS clear all 5 waves wins — phase=won cleared=5 kills=62 shrine=10
+PASS quest defeat-20 completes — kills=62
+PASS shrine 0 loses the game — phase=lost shrine=0
+PASS no Math.random in games/star-defense/defense.js
+PASS no Date.now in games/star-defense/defense.js
+PASS no performance.now in games/star-defense/defense.js
+ALL CHECKS PASSED

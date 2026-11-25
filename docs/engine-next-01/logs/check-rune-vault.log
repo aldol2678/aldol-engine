@@ -1,0 +1,136 @@
+PASS rune-vault manifest valid — []
+PASS rune-vault world adapted — levels=3 quests=4
+PASS manifest uses builtin assets only
+PASS ids and save key
+PASS rejects bad quest edge ref — invalid world manifest: [{"code":"E_QUEST_NODE_REF_NOT_FOUND","path":"quests[0].edges[0].to","detail
+PASS rejects missing puzzle rule — world manifest has no enabled "game.puzzle" rule
+PASS rejects another project's manifest — world manifest is for project "star-defense", expected "rune-vault"
+PASS rejects external asset uri — invalid world manifest: [{"code":"E_ASSET_URI","path":"assets[0].uri","detail":"https://example.com/
+PASS rejects ragged level rows — parseTileRows: all rows must have the same non-zero length
+PASS rejects level of another board size — rune-vault world: room-1: rows must be 11x7
+PASS rejects level without player — rune-vault world: room-1: needs exactly one P
+PASS rejects level with two players — rune-vault world: room-1: needs exactly one P
+PASS rejects level without goal — rune-vault world: room-1: needs a goal G
+PASS rejects unknown tile character — rune-vault world: room-1: unknown tile "X"
+PASS rejects plate linked to unknown door — rune-vault world: room-1: plate/lever points at unknown door "ghost"
+PASS rejects object inside a wall — rune-vault world: room-1: object door is off the floor
+PASS rejects object out of bounds — rune-vault world: room-1: object door is off the floor
+PASS rejects two objects on one cell — rune-vault world: room-1: two things share cell 3,1
+PASS rejects duplicate door id — rune-vault world: room-3: door id missing or duplicated
+PASS rejects lever on a sealed door — rune-vault world: room-2: a sealed door cannot have a plate or lever
+PASS rejects zero move limit — rune-vault world: room-2: moveLimit must be a positive integer
+PASS rejects fractional move limit — rune-vault world: room-2: moveLimit must be a positive integer
+PASS rejects unknown object kind — rune-vault world: room-1: unknown object kind "trap"
+PASS rejects duplicate level id — rune-vault world: duplicate level id
+PASS rejects empty level list — rune-vault world: config.levels must be a non-empty array
+PASS createState rejects a missing world — rune-vault needs a world from loadWorld()
+PASS start: room 1, playing, full moves
+PASS walking into a wall is a bump and costs no move
+PASS walking into the border wall costs no move
+PASS facing follows the last attempted direction
+PASS a free step costs exactly one move
+PASS door starts closed
+PASS pushing a crate onto the plate opens the door
+PASS push emits events in order (push, step, door) — push,step,door
+PASS crate against a wall cannot be pushed (no move spent)
+PASS crate cannot be pushed into the top wall
+PASS player standing on the plate opens the door
+PASS stepping off the plate closes the door again
+PASS a closed door blocks and costs no move — pos=4,3 left=13
+PASS two crates in a row cannot be pushed
+PASS a crate cannot be pushed into a closed door — player=3,3 crate=4
+PASS setup: door open while player is on the plate
+PASS door closes when nothing holds it
+PASS reaching the goal on the very last move clears the room
+PASS one move left: still playing
+PASS running out of moves fails the room
+PASS failed room ignores moves and next
+PASS reset after failure restarts the room with full moves
+PASS a failed-then-reset room can still be cleared
+PASS reset mid-room restores crate, player, doors and moves
+PASS entity ids keep growing across resets (never reused)
+PASS garbage inputs are ignored without throwing
+PASS reset wins over move in the same frame
+PASS room 1 solution clears it
+PASS quest escape-first-room completes with a rune reward
+PASS cleared room ignores move and reset
+PASS still paused one tick before the delay ends
+PASS next room starts exactly at clearAt
+PASS { next } skips the pause
+PASS lever door starts closed and blocks
+PASS stepping on the lever opens its door
+PASS stepping on the lever again closes it (toggle)
+PASS sealed door blocks without a key (no move spent)
+PASS walking onto the key picks it up
+PASS the key is consumed and the seal opens for good
+PASS quest use-a-key completes
+PASS a broken seal stays open after leaving it
+PASS reset returns the key to the floor and re-seals the door
+PASS quest progress and runes survive a room reset
+PASS an 'all' door stays closed with one of two plates pressed
+PASS both plates pressed open the 'all' door
+PASS solutions clear all three rooms and win
+PASS all quests done, each reward paid once (5 runes)
+PASS a won game ignores every input
+PASS inspect() reports the game summary
+PASS a failure keeps the flawless quest open even after winning
+PASS solver: room-1 is solvable within its 20 moves — shortest=12 states=91
+PASS solver: stored solution for room-1 is a shortest one — stored=12
+PASS solver: room-2 is solvable within its 36 moves — shortest=28 states=84
+PASS solver: stored solution for room-2 is a shortest one — stored=28
+PASS solver: room-3 is solvable within its 48 moves — shortest=40 states=2682
+PASS solver: stored solution for room-3 is a shortest one — stored=40
+PASS reference run wins through the timed room change
+PASS reference hash (seed rune-vault-m4, 280 frames, solution script) — hash=7772d3f5
+PASS different seed gives a different hash
+PASS determinism rune-vault: 12 seeds rerun identical
+PASS determinism rune-vault: 12 seeds replay identical
+PASS determinism rune-vault: 12 seeds save/restore mid-run identical
+PASS every seed's scripted run wins
+PASS 12 seeds give 12 distinct hashes
+PASS input order changes the result
+PASS idle frames do not change the puzzle outcome
+PASS save rune-vault: round-trip accepted
+PASS save rune-vault: empty rejected
+PASS save rune-vault: truncated rejected
+PASS save rune-vault: tampered payload rejected
+PASS save rune-vault: unknown version rejected
+PASS save rune-vault: older version rejected
+PASS save rune-vault: other game's save rejected
+PASS save rune-vault: wrong format rejected
+PASS save rune-vault: legacy M3 save shape rejected
+PASS save rune-vault: re-signed but invalid state rejected
+PASS a restored save plays on to the same state
+PASS save with unknown phase rejected
+PASS save with level out of range rejected
+PASS save with more moves than the limit rejected
+PASS save with player inside a wall rejected
+PASS save with two players rejected
+PASS save with over-capacity keys rejected
+PASS save with negative stats rejected
+PASS save with rewarded-but-not-done quest rejected
+PASS save with unknown component store rejected
+PASS save with a missing ecs rejected
+PASS save key differs from the existing games' keys
+PASS serialized save is small
+PASS sim imports >= 3 shared next-core modules — ecs, runtime, spatial, inventory, quest, save, manifest
+PASS sim reuses ecs, spatial, inventory, quest, runtime, save, manifest
+PASS sim does not import another game's sim or the M1 sim
+PASS sim holds no level data (no tile rows)
+PASS page has module script games/rune-vault/index.html
+PASS syntax games/rune-vault/index.html script[0]
+PASS page uses the shared HUD kit, board and shell
+PASS page pins three 0.187.0 and never uses 'latest'
+PASS page stores nothing but through the save slot / mute key
+PASS syntax games/rune-vault/vault.js
+PASS syntax tools/next/play/rune-vault.mjs
+PASS syntax tools/next/play/rune-vault-solutions.mjs
+PASS no Math.random in games/rune-vault/vault.js
+PASS no Date.now in games/rune-vault/vault.js
+PASS no performance.now in games/rune-vault/vault.js
+PASS no new Date in games/rune-vault/vault.js
+PASS no setTimeout in games/rune-vault/vault.js
+PASS no setInterval in games/rune-vault/vault.js
+PASS no fetch( in games/rune-vault/vault.js
+PASS no localStorage in games/rune-vault/vault.js
+ALL CHECKS PASSED (135)

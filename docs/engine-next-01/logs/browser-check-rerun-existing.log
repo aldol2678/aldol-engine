@@ -1,0 +1,12 @@
+engines: chromium=available firefox=NOT RUN (not installed) webkit=NOT RUN (not installed)
+browser: chromium 158.0.8127.36
+PASS chromium star-fishing desktop
+PASS chromium star-fishing phone-portrait
+PASS chromium star-fishing phone-landscape
+PASS chromium star-fishing narrow-portrait
+PASS chromium star-defense desktop
+PASS chromium star-defense phone-portrait
+PASS chromium star-defense phone-landscape
+PASS chromium star-defense narrow-portrait
+BROWSER CHECK PASSED (24 runs)
+exit=0
