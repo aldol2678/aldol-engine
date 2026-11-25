@@ -27,6 +27,13 @@ const args = process.argv.slice(2);
 const argOf = (name, fallback) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : fallback; };
 const OUT = path.resolve(ROOT, argOf("--out", "docs/engine-next-01"));
 const SHOTS = !args.includes("--no-shots");
+const selectedEngines = argOf("--engines","chromium,firefox,webkit").split(",");
+const firefoxProfile = argOf("--firefox-profile","default-headless");
+const settleGlb = args.includes("--settle-glb");
+if (!selectedEngines.length || new Set(selectedEngines).size !== selectedEngines.length ||
+    selectedEngines.some(x=>!["chromium","firefox","webkit"].includes(x))) throw Error("invalid --engines");
+if (!["default-headless","headless-software","headed-software"].includes(firefoxProfile)) throw Error("invalid Firefox profile");
+const serverGlbTrace = [];
 
 const CONFIGS = {
   desktop: { label: "PC 1280x800 (keyboard/mouse)", viewport: { width: 1280, height: 800 }, mobile: false },
@@ -60,7 +67,15 @@ function startServer() {
     const file = path.join(ROOT, rel);
     if (!file.startsWith(ROOT) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); res.end("not found"); return; }
     res.writeHead(200, { "content-type": MIME[path.extname(file)] || "application/octet-stream", "cache-control": "no-store" });
-    fs.createReadStream(file).pipe(res);
+    const stream=fs.createReadStream(file);
+    if (rel.endsWith(".glb")) {
+      const entry={path:rel,started:Date.now(),size:fs.statSync(file).size,remotePort:req.socket.remotePort,finished:false,closed:false};
+      serverGlbTrace.push(entry);
+      res.once("finish",()=>{entry.finished=true;entry.finishAt=Date.now();entry.bytesRead=stream.bytesRead;});
+      res.once("close",()=>{entry.closed=true;entry.closeAt=Date.now();entry.bytesRead=stream.bytesRead;});
+      stream.once("error",e=>{entry.streamError=String(e);});
+    }
+    stream.pipe(res);
   });
   return new Promise((resolve) => server.listen(0, "127.0.0.1", () => resolve({ server, base: `http://127.0.0.1:${server.address().port}` })));
 }
@@ -108,6 +123,7 @@ async function main() {
   const results = [];
   const engines = [];
   for (const [name, type] of [["chromium", chromium], ["firefox", firefox], ["webkit", webkit]]) {
+    if (!selectedEngines.includes(name)) continue;
     let available = false;
     try { available = fs.existsSync(type.executablePath()); } catch { available = false; }
     engines.push({ name, available, type });
@@ -117,7 +133,9 @@ async function main() {
   for (const engine of engines.filter((e) => e.available)) {
     let browser;
     try {
-      browser = await engine.type.launch();
+      const options = engine.name !== "firefox" || firefoxProfile === "default-headless" ? {} :
+        {headless:firefoxProfile !== "headed-software",env:{...process.env,LIBGL_ALWAYS_SOFTWARE:"1"}};
+      browser = await engine.type.launch(options);
       engine.status = "RUN";
     } catch (error) {
       engine.status = "FAIL (browser launch)";
@@ -139,12 +157,42 @@ async function main() {
         const page = await context.newPage();
         const consoleErrors = [];
         const failedRequests = [];
+        const requestFailures = [], glbTrace = [], navigation = [], pendingGlb = new Map();
+        const serverStart = serverGlbTrace.length;
+        let nav = 0, stage = "before-goto", nextRequest = 0, lastGlbEvent = Date.now();
+        const ids=new Map(), responses=new Map();
+        const isGlb=r=>new URL(r.url()).pathname.endsWith(".glb");
+        const requestId=r=>{if(!ids.has(r))ids.set(r,++nextRequest);return ids.get(r);};
+        const trace=(event,r,extra={})=>{
+          if(!isGlb(r))return;
+          lastGlbEvent=Date.now();
+          glbTrace.push({event,id:requestId(r),url:r.url(),at:lastGlbEvent,nav,stage,...extra});
+        };
+        const mark=(s)=>{stage=s;navigation.push({stage:s,nav,at:Date.now(),pendingGlb:[...pendingGlb.values()]});};
+        page.on("request",r=>{if(isGlb(r)){pendingGlb.set(r,requestId(r));trace("request",r);}});
+        page.on("requestfinished",r=>{trace("finished",r,{status:responses.get(r)??null});pendingGlb.delete(r);});
+        page.on("framenavigated",f=>{if(f===page.mainFrame())navigation.push({stage:"frame-navigated",nav,at:Date.now(),url:f.url()});});
+        async function settleAssetRequests() {
+          if(!settleGlb||gameId!=="star-fishing")return;
+          const until=Date.now()+5000;
+          while(pendingGlb.size||Date.now()-lastGlbEvent<200){
+            if(Date.now()>=until)throw Error("GLB request settlement timeout");
+            await page.waitForTimeout(50);
+          }
+        }
         page.on("console", (m) => { if (m.type() === "error") consoleErrors.push(m.text().slice(0, 300)); });
         page.on("pageerror", (e) => consoleErrors.push("pageerror: " + String(e.message).slice(0, 300)));
-        page.on("requestfailed", (r) => failedRequests.push(r.url()));
-        page.on("response", (r) => { if (r.status() >= 400) failedRequests.push(`${r.status()} ${r.url()}`); });
+        page.on("requestfailed",r=>{
+          failedRequests.push(r.url());
+          const detail={kind:"requestfailed",id:requestId(r),url:r.url(),errorText:r.failure()?.errorText||null,status:responses.get(r)??null,at:Date.now(),nav,stage};
+          requestFailures.push(detail);trace("failed",r,detail);pendingGlb.delete(r);
+        });
+        page.on("response",r=>{
+          const req=r.request();responses.set(req,r.status());trace("response",req,{status:r.status()});
+          if(r.status()>=400){failedRequests.push(`${r.status()} ${r.url()}`);requestFailures.push({kind:"http",id:requestId(req),url:r.url(),status:r.status(),at:Date.now(),nav,stage});}
+        });
 
-        const result = { engine: engine.name, game: gameId, config: configName, label: cfg.label, result: "FAIL", steps: [], issues: [], consoleErrors, failedRequests };
+        const result = { engine: engine.name, game: gameId, config: configName, label: cfg.label, result: "FAIL", steps: [], issues: [], consoleErrors, failedRequests, requestFailures, glbTrace, navigation, firefoxProfile: engine.name==="firefox"?firefoxProfile:null, settleGlb };
         const url = `${base}/${scenario.meta.path}`;
         const shot = async (tag) => {
           if (!SHOTS) return;
@@ -195,11 +243,19 @@ async function main() {
           },
           waitFor: (fn, arg, timeout = 30000) => page.waitForFunction(fn, arg, { timeout }),
           hud: async () => { const h = await measureHud(page); return { ...h, issues: hudIssues(h) }; },
-          reload: async () => { await page.reload(); await page.waitForFunction(scenario.meta.ready, null, { timeout: 30000 }); },
+          reload: async () => {
+            await settleAssetRequests();
+            mark("before-reload");nav++;
+            mark("reload-start");await page.reload();
+            await page.waitForFunction(scenario.meta.ready,null,{timeout:30000});mark("reload-ready");
+            await settleAssetRequests();
+          },
         };
         try {
+          nav++;mark("goto-start");
           await page.goto(url);
           await page.waitForFunction(scenario.meta.ready, null, { timeout: 30000 });
+          mark("goto-ready");await settleAssetRequests();
           await page.evaluate((key) => { localStorage.removeItem(key); localStorage.setItem("aldol-engine.audio.muted", "1"); }, scenario.meta.saveKey);
           await ctx.reload();
           const hud0 = await ctx.hud();
@@ -211,7 +267,7 @@ async function main() {
           };
           hudExpect("start", hud0.issues);
           await shot("start");
-          await scenario.play(page, ctx);
+          mark("play-start");await scenario.play(page, ctx);mark("play-end");await settleAssetRequests();
           const hud1 = await ctx.hud();
           result.hudEnd = hud1.issues;
           hudExpect("end", hud1.issues);
@@ -225,9 +281,16 @@ async function main() {
           result.issues.push("exception: " + String(e && e.message).slice(0, 400));
           try { await shot("error"); } catch { /* page may be gone */ }
         }
+        const verdictAt=Date.now();
+        result.verdictAt=verdictAt;
+        // Capture actual test verdict before intentional context teardown.
+        // Teardown events are logged separately and cannot hide earlier errors.
+        mark("teardown");await context.close();
+        result.serverGlbTrace=serverGlbTrace.slice(serverStart);
+        result.requestFailuresDuringTest=requestFailures.filter(e=>e.stage!=="teardown");
         console.log(`${result.result} ${engine.name} ${gameId} ${configName}${result.issues.length ? " — " + result.issues.join(" | ") : ""}`);
+        if(result.requestFailuresDuringTest.length) console.log("REQUEST_FAILURES",JSON.stringify(result.requestFailuresDuringTest));
         results.push(result);
-        await context.close();
       }
     }
     await browser.close();
@@ -251,6 +314,7 @@ async function main() {
     three: "0.187.0 (local copy of the npm package served for the unpkg importmap URL)",
     engines: engines.map((e) => ({ name: e.name, status: e.status || "NOT RUN (browser not installed in this environment)", ...(e.error ? { error: e.error } : {}) })),
     realDevices: "NOT RUN (touch results are browser touch emulation, not real devices)",
+    firefoxProfile, settleGlb, selectedEngines,
     results,
     superseded,
   };
