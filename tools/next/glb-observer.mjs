@@ -5,11 +5,32 @@ import fs from "node:fs";
 import path from "node:path";
 import {createHash} from "node:crypto";
 const sha=b=>createHash("sha256").update(b).digest("hex");
+export function fetchTraceInit(){
+  const original=globalThis.fetch;
+  globalThis.__NEXT07_FETCH__=[];
+  globalThis.fetch=function(...args){
+    return original.apply(this,args).then(response=>{
+      // Read metadata only; do not clone or consume the response body.
+      try{
+        const url=new URL(response.url,location.href);
+        if(url.pathname.endsWith(".glb"))globalThis.__NEXT07_FETCH__.push({url:url.href,token:response.headers.get("x-next06-glb-id"),status:response.status,at:Date.now()});
+      }catch{}
+      return response;
+    });
+  };
+}
+export function instrumentVendor(source){
+  const anchor="scope.parse( data, resourcePath, function ( gltf ) {";
+  if(source.split(anchor).length!==2)throw Error("GLTFLoader source anchor missing/ambiguous");
+  return source.replace(anchor,"scope.__next07LoadUrl = url;\n\t\t\t\t"+anchor)+"\n"+parseTap;
+}
 export const parseTap=`
 const __next06OriginalParse=GLTFLoader.prototype.parse;
 GLTFLoader.prototype.parse=function(data,base,onLoad,onError){
   const rows=globalThis.__NEXT06_GLB_PARSE__ ||= [];
-  const row={base,at:Date.now(),bytes:data instanceof ArrayBuffer?data.byteLength:null,status:"pending"};
+  const modelUrl=this.__next07LoadUrl?new URL(this.__next07LoadUrl,location.href).href:null;
+  const matches=(globalThis.__NEXT07_FETCH__||[]).filter(f=>f.url===modelUrl);
+  const row={base,modelUrl,token:matches.length===1?matches[0].token:null,responseMatches:matches.length,at:Date.now(),bytes:data instanceof ArrayBuffer?data.byteLength:null,status:"pending"};
   rows.push(row);
   row.digest=data instanceof ArrayBuffer?
     crypto.subtle.digest("SHA-256",data).then(b=>Array.from(new Uint8Array(b),v=>v.toString(16).padStart(2,"0")).join("")).catch(e=>({error:String(e)})):
@@ -75,8 +96,9 @@ export async function observeGlb(context,page,getStage){
     async captureDocument(expected){
       const rows=await page.evaluate(async()=>Promise.all((globalThis.__NEXT06_GLB_PARSE__||[]).map(async ({digest,...row})=>({...row,sha256:await digest}))));
       const assets=await page.evaluate(()=>globalThis.__STAR_FISHING__?.assets??null);
+      const fetchRows=await page.evaluate(()=>globalThis.__NEXT07_FETCH__||[]);
       const match=expected.every(e=>rows.filter(r=>r.sha256===e.sha256&&r.bytes===e.bytes&&r.status==="decoded"&&r.meshes>0&&r.vertices>0).length===1);
-      const document={...getStage(),at:Date.now(),rows,assets,ok:rows.length===expected.length&&match&&assets?.loaded?.length===2&&assets?.failed?.length===0};
+      const document={...getStage(),at:Date.now(),rows,assets,fetchRows,ok:rows.length===expected.length&&match&&assets?.loaded?.length===2&&assets?.failed?.length===0};
       documents.push(document);return document;
     },
     async finish(){
