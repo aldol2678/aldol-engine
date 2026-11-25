@@ -35,9 +35,10 @@ const server = http.createServer((req,res)=>{
 });
 await new Promise(r=>server.listen(0,"127.0.0.1",r));
 const base="http://127.0.0.1:"+server.address().port;
+const headlessEnv=Object.fromEntries(Object.entries(process.env).filter(([k])=>!["DISPLAY","WAYLAND_DISPLAY","LIBGL_ALWAYS_SOFTWARE"].includes(k)));
 const profiles=[
-  {name:"default-headless",options:{headless:true}},
-  {name:"headless-software",options:{headless:true,env:{...process.env,LIBGL_ALWAYS_SOFTWARE:"1"}}},
+  {name:"default-headless",options:{headless:true,env:headlessEnv}},
+  {name:"headless-software",options:{headless:true,env:{...headlessEnv,LIBGL_ALWAYS_SOFTWARE:"1"}}},
   {name:"headed-software",options:{headless:false,env:{...process.env,LIBGL_ALWAYS_SOFTWARE:"1"}}},
 ];
 const report={display:process.env.DISPLAY||null,firefox:[],chromium:null,assetBytes:asset.length,selectedProfile:null};
