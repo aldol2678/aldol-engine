@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { performance } from "node:perf_hooks";
 import { Rng } from "../../src/core/rng.js";
-import { defineGame } from "../../src/core/next/runtime.js";
+import { defineGame, MAX_RNG_DRAWS } from "../../src/core/next/runtime.js";
 import { serializeSave, parseSave } from "../../src/core/next/save.js";
 
 const game = defineGame({
@@ -11,11 +11,11 @@ const game = defineGame({
   step(state, input, {rng}) { state.value = rng.next(); },
 });
 const world = {};
-const cap = 50_000_000;
+const legacyCap = 50_000_000;
 const rows = [];
 // Warm up without suppressing cold samples for each size.
 for (const seed of ["engine-next-02", "unicode-별"]) {
-  for (const draws of [0, 1000, 1_000_000, 10_000_000, cap]) {
+  for (const draws of [0, 1000, 1_000_000, 10_000_000, legacyCap, legacyCap + 1]) {
     const snapshot = {tick: draws, seed, rngDraws: draws, value: 0};
     const text = serializeSave({gameId: game.id, version: game.version, state: snapshot});
     const expected = new Rng(seed);
@@ -37,10 +37,12 @@ for (const seed of ["engine-next-02", "unicode-별"]) {
     rows.push({seed, draws, samplesMs:samples.map(x=>Number(x.toFixed(3))), maxMs:Number(Math.max(...samples).toFixed(3)), sequence:"PASS"});
   }
 }
-for (const draws of [-1, 0.5, cap+1, Infinity, NaN]) {
+for (const draws of [-1, 0.5, MAX_RNG_DRAWS+1, Infinity, NaN]) {
   const s = {tick:0, seed:"engine-next-02", rngDraws:draws, value:0};
   assert.equal(game.validateState(s, world), "rngDraws");
   assert.throws(()=>game.restore(s, world), /rngDraws/);
 }
-console.log(JSON.stringify({node:process.version,platform:process.platform,method:"serialize/parse/restore, 2 seeds x 5 sizes x 3 repeats, 16 next values per sample",rows,threshold50ms:"diagnostic only; browser and mobile still need measurement",over50ms:rows.filter(x=>x.maxMs>50).length},null,2));
+console.log(JSON.stringify({node:process.version,platform:process.platform,method:"serialize/parse/restore, 2 seeds x 6 sizes x 3 repeats, 16 next values per sample",rows,threshold50ms:"diagnostic only; browser and mobile still need measurement",over50ms:rows.filter(x=>x.maxMs>50).length},null,2));
 console.log("PASS RNG restore stream parity and rejection bounds; timing reported separately");
+
+await import('./rng-compat-check.mjs');
