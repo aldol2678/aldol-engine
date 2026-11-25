@@ -11,11 +11,9 @@
 // ctx = { rng, world, tick }. The runtime owns state.tick, state.seed and
 // state.rngDraws; everything else belongs to the game.
 //
-// RNG: the shared Rng (src/core/rng.js) is reused unchanged. Its stream
-// position lives in a closure, so this module wraps it in a counter
-// (CountedRng) and stores the draw count in state.rngDraws. Restoring a
-// snapshot re-creates Rng(seed) and fast-forwards that many draws — the
-// same numbers come out after a save/load as in an uninterrupted run.
+// RNG: reuse the Rng helpers and preserve the FNV-1a / Mulberry32 stream.
+// A counted uint32 stream position permits constant-time restore and
+// interoperable MarginLife v1 snapshots without modifying shared rng.js.
 // Pure module: no rendering, no wall clock, no network.
 
 import { Rng } from "../rng.js";
@@ -24,18 +22,59 @@ import { stateHash } from "../state-hash.js";
 export const TICK = 1 / 60;
 export const TICKS_PER_SECOND = 60;
 
+// One complete Mulberry32 cycle. The persisted rngDraws field now means
+// position within this cycle; all previously valid counts are unchanged.
+// Wrapping is intentional: after 2^32 draws the stream state repeats.
+export const MAX_RNG_DRAWS = 0xffffffff;
+const RNG_INCREMENT = 0x6d2b79f5;
+const RNG_INCREMENT_INVERSE = 0xdc58aa5d; // inverse modulo 2^32
+
+function seedState(seed) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+}
+
+function validDrawPosition(draws) {
+  return Number.isInteger(draws) && draws >= 0 && draws <= MAX_RNG_DRAWS;
+}
+
 export class CountedRng extends Rng {
   constructor(seedString, draws = 0) {
     super(seedString);
-    if (!Number.isInteger(draws) || draws < 0) throw new Error("CountedRng: draws must be a non-negative integer");
-    const base = this.next;
-    this.draws = 0;
-    this.next = () => {
-      this.draws += 1;
-      return base();
+    if (!validDrawPosition(draws)) throw new Error("CountedRng: draws must be a non-negative integer within uint32");
+    // Pin the existing FNV-1a + Mulberry32 stream without changing rng.js.
+    // Arithmetic jump is O(1), independent of the restored position.
+    const initial = seedState(this.seedString);
+    let position = draws >>> 0;
+    let state = (initial + Math.imul(position, RNG_INCREMENT)) >>> 0;
+    const next = () => {
+      state = (state + RNG_INCREMENT) >>> 0;
+      position = (position + 1) >>> 0;
+      let t = Math.imul(state ^ (state >>> 15), 1 | state);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
-    for (let i = 0; i < draws; i++) base();
-    this.draws = draws;
+    next.getState = () => state;
+    next.setState = (value) => {
+      if (!validDrawPosition(value)) throw new Error("invalid RNG state");
+      state = value >>> 0;
+      position = Math.imul((state - initial) >>> 0, RNG_INCREMENT_INVERSE) >>> 0;
+    };
+    this.next = next;
+    Object.defineProperty(this, "draws", { enumerable: true, get: () => position });
+  }
+  // MarginLife v1 snapshot shape, also available with the unmodified main Rng.
+  snapshot() {
+    return { version: 1, seed: this.seedString, state: this.next.getState() };
+  }
+  restore(snapshot) {
+    if (!snapshot || snapshot.version !== 1 || snapshot.seed !== this.seedString ||
+        !validDrawPosition(snapshot.state)) throw new Error("invalid or incompatible RNG snapshot");
+    this.next.setState(snapshot.state);
   }
 }
 
@@ -137,7 +176,7 @@ export function defineGame(def) {
       if (!state || typeof state !== "object" || Array.isArray(state)) return "state is not an object";
       if (!Number.isInteger(state.tick) || state.tick < 0) return "tick";
       if (typeof state.seed !== "string") return "seed";
-      if (!Number.isInteger(state.rngDraws) || state.rngDraws < 0 || state.rngDraws > 50000000) return "rngDraws";
+      if (!validDrawPosition(state.rngDraws)) return "rngDraws";
       return def.validateState ? def.validateState(state, world) : null;
     },
   };
