@@ -1,0 +1,37 @@
+// Pure adversarial cases: unit-level guard, NOT a substitute for real faults.
+import assert from "node:assert/strict";
+import {judgeAsset,judgeGlb,judgeSave,consoleSource} from "./evidence-verdict.mjs";
+const e={name:"star-fish.glb",urlPath:"/games/star-fishing/assets/models/star-fish.glb",bytes:100,sha256:"original"};
+const r={token:"t",url:"http://local"+e.urlPath,nav:1,status:200,terminal:"loadingFinished",body:{bytes:100,sha256:"original"},dataLength:100};
+const s={token:"t",path:e.urlPath,status:200,finished:true,bytesRead:100};
+const d={nav:1,fetchRows:[{token:"t",url:r.url,status:200}],rows:[{token:"t",modelUrl:r.url,bytes:100,sha256:"original",status:"decoded",meshes:1,vertices:3}],assets:{loaded:["star-fish"],failed:[]}};
+const pw=[{event:"response",token:"t",url:r.url,nav:1,status:200},{event:"finished",token:"t"}];
+const copy=x=>JSON.parse(JSON.stringify(x));
+const base={expected:e,request:r,server:s,document:d,playwright:pw};
+let count=0;
+function check(label,mut,want){const a=copy(base);mut(a);assert.equal(judgeAsset(a).verdict,want,label);console.log("PASS",label);count++;}
+const abort=a=>{Object.assign(a.request,{terminal:"loadingFailed",errorText:"net::ERR_ABORTED",canceled:true,body:null,bodyError:"No data found for resource"});a.playwright[1]={event:"failed",token:"t",errorText:"net::ERR_ABORTED"};};
+check("all layers agree",()=>{},"PASS");
+check("abort with complete independently proven bytes",abort,"HOLD_OBSERVATION_MISMATCH");
+check("missing CDP data length",a=>{abort(a);delete a.request.dataLength;},"HOLD_NETWORK");
+check("abort with partial bytes",a=>{abort(a);a.request.dataLength=50;a.server.bytesRead=50;a.server.finished=false;a.document.rows=[];a.document.assets={loaded:[],failed:["star-fish"]};},"FAIL_TRANSFER");
+check("corrupt same length",a=>{a.document.rows[0].sha256="corrupt";},"FAIL_INTEGRITY");
+check("404 and fallback",a=>{a.request.status=404;a.server.status=404;a.document.fetchRows[0].status=404;a.playwright[0].status=404;a.document.rows=[];a.document.assets={loaded:[],failed:["star-fish"]};},"FAIL_HTTP");
+check("wrong response token",a=>{a.document.rows[0].token="other";},"HOLD_OR_FAIL_DECODE");
+check("duplicate fetch",a=>{a.document.fetchRows.push(copy(a.document.fetchRows[0]));},"HOLD_ATTRIBUTION");
+check("missing response",a=>{a.playwright=[];},"HOLD_ATTRIBUTION");
+check("decoder error",a=>{a.document.rows[0].status="decode-error";},"FAIL_DECODE");
+check("wrong CDP body",a=>{a.request.body.sha256="corrupt";},"HOLD_NETWORK");
+check("unproven abort",a=>{abort(a);a.document.rows=[];},"HOLD_OR_FAIL_DECODE");
+check("server mismatch",a=>{a.server.finished=false;},"HOLD_TRANSFER_CONFLICT");
+check("wrong doc",a=>{a.document.nav=2;},"HOLD_ATTRIBUTION");
+const good={before:{},after:{},movement:true,shortControl:true,intervalObserved:true,restored:true,consoleEvidence:[]};
+assert.equal(judgeSave(good).release,"PASS");count++;
+assert.equal(judgeSave({...good,restored:false}).functional,"FAIL");count++;
+assert.equal(judgeSave({...good,consoleEvidence:[{message:"InvalidStateError: Navigated away from page"}]}).release,"HOLD");count++;
+assert.equal(judgeSave({...good,before:null}).functional,"HOLD");count++;
+assert.equal(consoleSource({message:"InvalidStateError: Navigated away from page"}),"UNATTRIBUTED");count++;
+assert.equal(consoleSource({kind:"window-error",message:"actual page error"}),"PAGE_OR_PRODUCT_SOURCE");count++;
+assert.equal(consoleSource({location:{url:"resource://gre/modules/Test.sys.mjs"}}),"BROWSER_OR_HARNESS_SOURCE");count++;
+assert.equal(judgeGlb({result:"PASS"},[e]).release,"HOLD");count++;
+console.log("PASS evidence verdict unit assertions:",count);

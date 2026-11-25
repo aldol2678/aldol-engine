@@ -12,10 +12,84 @@ on:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Show toolchain
         run: node --version && npm --version
       - name: Run all checks
         run: npm run check:all
+
+      - name: Run Next engine checks when present
+        if: ${{ hashFiles('tools/check-next-all.mjs') != '' }}
+        run: node tools/check-next-all.mjs
+      - name: Stress RNG save restoration when present
+        if: ${{ hashFiles('tools/next/rng-restore-stress.mjs') != '' }}
+        run: node tools/next/rng-restore-stress.mjs
+      - name: Verify actual MarginLife P3 combined source tree
+        if: ${{ github.event_name == 'pull_request' && github.head_ref == 'feat/ark-engine-next-04' && hashFiles('tools/next/verify-combined-marginlife.sh') != '' }}
+        timeout-minutes: 10
+        run: bash tools/next/verify-combined-marginlife.sh "$RUNNER_TEMP/engine-next-evidence/combined"
+      # ENGINE-NEXT-07: one focused CI lane. Raw failures remain evidence.
+      - name: Evidence classifier adversarial unit checks
+        if: ${{ hashFiles('tools/next/evidence-verdict-check.mjs') != '' }}
+        run: node tools/next/evidence-verdict-check.mjs
+      - name: Install focused browser verification tooling
+        id: browser_install
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && github.head_ref == 'feat/ark-engine-next-07' }}
+        timeout-minutes: 10
+        env:
+          NODE_PATH: ${{ runner.temp }}/engine-next-browser/node_modules
+        run: |
+          cat /etc/os-release
+          npm install --prefix "$RUNNER_TEMP/engine-next-browser" --no-save --package-lock=false --ignore-scripts playwright@1.56.1 three@0.187.0
+          "$RUNNER_TEMP/engine-next-browser/node_modules/.bin/playwright" install --with-deps chromium firefox
+          command -v xvfb-run
+          command -v xauth
+          for f in evidence-verdict.mjs evidence-verdict-check.mjs lifecycle-source-check.mjs glb-observer.mjs browser-check.mjs verify-evidence-controls.mjs; do
+            node --check "tools/next/$f"
+          done
+      - name: Firefox navigation error provenance and real storage-denial controls
+        if: ${{ !cancelled() && steps.browser_install.outcome == 'success' && github.event_name == 'pull_request' && github.head_ref == 'feat/ark-engine-next-07' }}
+        timeout-minutes: 10
+        env:
+          NODE_PATH: ${{ runner.temp }}/engine-next-browser/node_modules
+          THREE_BUILD_DIR: ${{ runner.temp }}/engine-next-browser/node_modules/three/build
+        run: |
+          xvfb-run -a node tools/next/lifecycle-source-check.mjs "$RUNNER_TEMP/engine-next-07/lifecycle"
+      - name: Actual GLB transfer, corrupt bytes and 404 controls
+        if: ${{ !cancelled() && steps.browser_install.outcome == 'success' && github.event_name == 'pull_request' && github.head_ref == 'feat/ark-engine-next-07' }}
+        timeout-minutes: 18
+        env:
+          NODE_PATH: ${{ runner.temp }}/engine-next-browser/node_modules
+          THREE_BUILD_DIR: ${{ runner.temp }}/engine-next-browser/node_modules/three/build
+        run: |
+          for name in nominal-1 nominal-2 nominal-3 fault-truncate fault-corrupt fault-404; do
+            out="$RUNNER_TEMP/engine-next-07/glb-$name"
+            mkdir -p "$out"
+            flags=()
+            case "$name" in
+              fault-*) flags+=(--glb-fault "${name#fault-}");;
+            esac
+            status=0
+            node tools/next/browser-check.mjs --engines chromium --games star-fishing --configs desktop --glb-observe "${flags[@]}" --out "$out" --no-shots || status=$?
+            printf '%s\n' "$status" > "$out/raw-exit-code.txt"
+          done
+          # A passing diagnostic method does not mean release eligibility.
+          node tools/next/verify-evidence-controls.mjs "$RUNNER_TEMP/engine-next-07"
+      - name: Preserve original raw verdicts and focused evidence
+        if: ${{ always() && github.event_name == 'pull_request' && github.head_ref == 'feat/ark-engine-next-07' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: engine-next-07-evidence-verdict
+          path: ${{ runner.temp }}/engine-next-07/
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Strict release verification (unresolved anomalies remain HOLD)
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && github.head_ref == 'feat/ark-engine-next-07' }}
+        run: |
+          node --input-type=module -e '
+            import fs from "node:fs";
+            const v=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/engine-next-07/verdict-summary.json","utf8"));
+            if(!v.diagnosticPass||v.release!=="PASS"){console.error("HOLD: diagnostic evidence is incomplete or strict release verification is unresolved");process.exit(1);}
+            console.log("Focused strict verification passed; canonical approval still separate");'

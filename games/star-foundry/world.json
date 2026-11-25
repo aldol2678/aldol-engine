@@ -1,0 +1,387 @@
+{
+  "schemaVersion": "worldforge/0.1",
+  "project": {
+    "id": "star-foundry",
+    "name": "별 공방"
+  },
+  "world": {
+    "id": "star-foundry-workshop",
+    "name": "별 공방 작업장",
+    "version": "0.1.0",
+    "description": "M6 후보 — 별광석을 캐서 벨트로 나르고, 제련·조립해 별등을 납품하는 물류·생산 자동화"
+  },
+  "assets": [
+    {
+      "id": "mine",
+      "type": "model",
+      "uri": "builtin:mine"
+    },
+    {
+      "id": "well",
+      "type": "model",
+      "uri": "builtin:well"
+    },
+    {
+      "id": "depot",
+      "type": "model",
+      "uri": "builtin:depot"
+    }
+  ],
+  "zones": [
+    {
+      "id": "workshop",
+      "name": "작업장",
+      "type": "zone.workshop",
+      "geometry": {
+        "type": "polygon",
+        "space": "local",
+        "points": [
+          [
+            -0.5,
+            -0.5
+          ],
+          [
+            9.5,
+            -0.5
+          ],
+          [
+            9.5,
+            6.5
+          ],
+          [
+            -0.5,
+            6.5
+          ]
+        ]
+      }
+    }
+  ],
+  "places": [
+    {
+      "id": "spawn",
+      "name": "작업장 한가운데",
+      "type": "place.spawn",
+      "zoneId": "workshop",
+      "position": [
+        4.5,
+        0,
+        3
+      ]
+    }
+  ],
+  "paths": [],
+  "entities": [
+    {
+      "id": "ent-ore-mine",
+      "name": "별광석 광산",
+      "type": "entity.source",
+      "assetId": "mine",
+      "enabled": true,
+      "parentId": null,
+      "tags": [
+        "fixed"
+      ],
+      "transform": {
+        "position": [
+          0,
+          0,
+          3
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": {
+        "game.source": {
+          "item": "ore",
+          "intervalTicks": 40,
+          "jitterTicks": 10,
+          "dir": "right"
+        }
+      }
+    },
+    {
+      "id": "ent-crystal-well",
+      "name": "수정 샘",
+      "type": "entity.source",
+      "assetId": "well",
+      "enabled": true,
+      "parentId": null,
+      "tags": [
+        "fixed"
+      ],
+      "transform": {
+        "position": [
+          5,
+          0,
+          6
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": {
+        "game.source": {
+          "item": "crystal",
+          "intervalTicks": 50,
+          "jitterTicks": 10,
+          "dir": "up"
+        }
+      }
+    },
+    {
+      "id": "ent-depot",
+      "name": "납품 창고",
+      "type": "entity.depot",
+      "assetId": "depot",
+      "enabled": true,
+      "parentId": null,
+      "tags": [
+        "fixed"
+      ],
+      "transform": {
+        "position": [
+          9,
+          0,
+          3
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "components": {
+        "game.depot": {}
+      }
+    }
+  ],
+  "npcs": [],
+  "events": [],
+  "quests": [
+    {
+      "id": "build-first-belt",
+      "name": "첫 벨트 놓기",
+      "type": "quest.order",
+      "nodes": [
+        {
+          "id": "start",
+          "type": "quest.start"
+        },
+        {
+          "id": "goal",
+          "type": "quest.condition",
+          "params": {
+            "stat": "built.belt",
+            "op": ">=",
+            "value": 1
+          }
+        },
+        {
+          "id": "done",
+          "type": "quest.complete"
+        }
+      ],
+      "edges": [
+        {
+          "from": "start",
+          "to": "goal"
+        },
+        {
+          "from": "goal",
+          "to": "done"
+        }
+      ]
+    },
+    {
+      "id": "order-ingots",
+      "name": "주문 1: 별쇠 3개 납품",
+      "type": "quest.order",
+      "nodes": [
+        {
+          "id": "start",
+          "type": "quest.start"
+        },
+        {
+          "id": "goal",
+          "type": "quest.condition",
+          "params": {
+            "stat": "delivered.ingot",
+            "op": ">=",
+            "value": 3
+          }
+        },
+        {
+          "id": "done",
+          "type": "quest.complete",
+          "params": {
+            "reward": {
+              "items": {
+                "coin": 30
+              }
+            }
+          }
+        }
+      ],
+      "edges": [
+        {
+          "from": "start",
+          "to": "goal"
+        },
+        {
+          "from": "goal",
+          "to": "done"
+        }
+      ]
+    },
+    {
+      "id": "order-lamps",
+      "name": "주문 2: 별등 5개 납품",
+      "type": "quest.order",
+      "nodes": [
+        {
+          "id": "start",
+          "type": "quest.start"
+        },
+        {
+          "id": "goal",
+          "type": "quest.condition",
+          "params": {
+            "stat": "delivered.lamp",
+            "op": ">=",
+            "value": 5
+          }
+        },
+        {
+          "id": "done",
+          "type": "quest.complete",
+          "params": {
+            "reward": {
+              "items": {
+                "coin": 50
+              }
+            }
+          }
+        }
+      ],
+      "edges": [
+        {
+          "from": "start",
+          "to": "goal"
+        },
+        {
+          "from": "goal",
+          "to": "done"
+        }
+      ]
+    }
+  ],
+  "rules": [
+    {
+      "id": "rule-foundry",
+      "name": "별 공방 규칙",
+      "type": "game.foundry",
+      "enabled": true,
+      "config": {
+        "grid": {
+          "rows": [
+            "..........",
+            "...#......",
+            "..........",
+            "..........",
+            "..........",
+            "......#...",
+            ".........."
+          ]
+        },
+        "beltTicks": 12,
+        "startCoins": 120,
+        "bankCoins": 100000,
+        "deadlineTicks": 14400,
+        "refundPercent": 50,
+        "items": {
+          "ore": {
+            "name": "별광석"
+          },
+          "crystal": {
+            "name": "수정"
+          },
+          "ingot": {
+            "name": "별쇠"
+          },
+          "lamp": {
+            "name": "별등"
+          }
+        },
+        "buildings": {
+          "belt": {
+            "name": "벨트",
+            "type": "belt",
+            "cost": 5
+          },
+          "smelter": {
+            "name": "제련소",
+            "type": "machine",
+            "cost": 30,
+            "recipe": {
+              "inputs": {
+                "ore": 2
+              },
+              "outputs": {
+                "ingot": 1
+              },
+              "ticks": 60
+            },
+            "inputStacks": 2,
+            "outputCap": 2
+          },
+          "assembler": {
+            "name": "조립기",
+            "type": "machine",
+            "cost": 40,
+            "recipe": {
+              "inputs": {
+                "ingot": 1,
+                "crystal": 1
+              },
+              "outputs": {
+                "lamp": 1
+              },
+              "ticks": 60
+            },
+            "inputStacks": 2,
+            "outputCap": 2
+          }
+        },
+        "depot": {
+          "accepts": {
+            "ingot": 10,
+            "lamp": 25
+          }
+        }
+      }
+    }
+  ]
+}

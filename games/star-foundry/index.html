@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>별 공방 M6 — 벨트·제련·조립 자동화 | Aldol Engine</title>
+<meta property="og:title" content="별 공방 M6 — 벨트·제련·조립 자동화 | Aldol Engine">
+<meta property="og:description" content="Aldol Engine 차세대 코어 후보 위의 물류·생산 자동화. 벨트를 깔고 제련소와 조립기를 이어 별쇠와 별등 주문을 납기 안에 채운다.">
+<meta property="og:type" content="website">
+<style>
+/* Page-local layout only (the shared HUD kit CSS is not changed). */
+.hud-panel { box-sizing: border-box; }
+#phase { text-align: right; }
+#help { display: none; }
+@media (min-width: 900px) and (min-height: 600px) { #help { display: block; } }
+@media (max-width: 640px) { .hud-panel { max-width: 50vw; } .hud-panel.top-right { max-width: 38vw; } }
+/* Short landscape phones: keep the panels narrow so the board stays visible. */
+@media (max-height: 500px) { .hud-panel { max-width: 200px; } .hud-panel h1 { font-size: 13px; } }
+.hud-btn.tool { border-radius: 14px; }
+.hud-btn.tool.selected { box-shadow: 0 0 0 3px #fff; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.187.0/build/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { game, loadWorld, SEED, SAVE_KEY, coins, canBuild, canRemove, listBuildings, listItems, itemLedger } from "./foundry.js";
+import { isBlocked, DIRS4 } from "../../src/core/next/spatial.js";
+import { createBoard, easeTo } from "../../src/render/next/board.js";
+import { createSaveSlot, createRunner, startLoop, bindKeys, installProbe } from "../../src/render/next/shell.js";
+import { createAudioManager } from "../../src/render/audio.js";
+import { installHudCss, createHudPanel, createHelp, createRoundButton, bindMute, renderQuests, setSaveText } from "../../src/render/hud.js";
+
+// World: the manifest is the only source of the grid, costs, recipes and
+// orders. A manifest that fails validation stops the game here.
+const manifest = await (await fetch("./world.json")).json();
+const world = loadWorld(manifest);
+const cfg = world.config;
+
+// Audio: procedural WebAudio voices (no audio files). BGM starts on the first gesture.
+const audio = createAudioManager();
+let muted = false;
+try { muted = localStorage.getItem("aldol-engine.audio.muted") === "1"; } catch { muted = false; }
+audio.setMuted(muted);
+window.addEventListener("pointerdown", () => audio.startBgm(), { once: true });
+window.addEventListener("keydown", () => audio.startBgm(), { once: true });
+
+// --- HUD (shared kit, lake theme) ---
+installHudCss("lake");
+const panel = createHudPanel({
+  id: "hud",
+  title: "별 공방 M6",
+  rows: [
+    { id: "coins", tag: "div" },
+    { id: "time", tag: "div" },
+    { id: "tool", tag: "div" },
+    { id: "quests", tag: "div", collapsible: true },
+    { id: "save-state", tag: "div", collapsible: true },
+  ],
+});
+const phasePanel = createHudPanel({ id: "phase", position: "right", style: { color: "#ffe9a8", padding: "8px 12px" }, rows: [{ id: "phase-text", tag: "div" }] });
+createHelp("1 벨트 · 2 제련소 · 3 조립기 · 4 철거 · R 방향 · 방향키+Enter 설치 · F 배속 · N 새 게임 · M 음소거", "center");
+const short = () => window.innerHeight < 500;
+if (short() && !panel.el.classList.contains("collapsed")) panel.el.querySelector(".hud-toggle")?.click();
+
+// --- Sim session: start or restore, one command per tick ---
+const REASON = { phase: "게임이 끝났어요", kind: "알 수 없는 건물", dir: "방향 오류", bounds: "공방 밖이에요", wall: "기둥 자리예요", occupied: "이미 건물이 있어요", coins: "코인이 부족해요", empty: "철거할 건물이 없어요", fixed: "원천·창고는 철거할 수 없어요", shape: "잘못된 명령" };
+const VOICE = { built: "cast", removed: "hit", refused: "hurt", crafted: "talk", delivered: "bite", order: "quest", won: "quest", lost: "hurt" };
+const SAVE_ON = { built: "설치, 저장됨", removed: "철거, 저장됨", delivered: "납품, 저장됨", order: "주문 완료, 저장됨", won: "완료, 저장됨", lost: "실패, 저장됨" };
+let hudDirty = true;
+let notice = "";
+let noticeTicks = 0;
+const saveSlot = createSaveSlot({ key: SAVE_KEY, game, world });
+const runner = createRunner({
+  game, world, seed: SEED, saveSlot,
+  onStep(state, events) {
+    if (events.length > 0 || state.tick % 30 === 0) hudDirty = true;
+    if (noticeTicks > 0 && --noticeTicks === 0) { notice = ""; hudDirty = true; }
+    for (const ev of events) {
+      if (VOICE[ev.type]) audio.play(VOICE[ev.type]);
+      if (ev.type === "refused") { notice = REASON[ev.data.reason] || "설치할 수 없어요"; noticeTicks = 150; }
+    }
+  },
+  shouldSave(state, events) {
+    let note = null;
+    for (const ev of events) if (ev.type in SAVE_ON) note = SAVE_ON[ev.type];
+    return note;
+  },
+});
+const load = runner.loadResult;
+let saveNote = load.ok ? "불러옴" : load.code === "E_NONE" ? "새 게임" : `저장 손상(${load.code}) — 새로 시작`;
+
+// --- Board (shared Three.js board; primitives only) ---
+function computeInsets() {
+  if (window.innerWidth < window.innerHeight) return { top: 0.26, bottom: 0.36 };
+  if (short()) return { top: 0.03, bottom: 0.03 };
+  return { top: 0.12, bottom: 0.14 };
+}
+const insets = computeInsets();
+const board = createBoard({
+  container: document.getElementById("app"), cols: world.grid.cols, rows: world.grid.rows,
+  isWall: (c, r) => isBlocked(world.grid, c, r), theme: "lake", insets,
+});
+window.addEventListener("resize", () => { Object.assign(insets, computeInsets()); board.fit(); });
+
+const mat = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.8, ...extra });
+const ITEM_COLOR = { ore: 0x8d6e63, crystal: 0x7fe0ff, ingot: 0xd9dde3, lamp: 0xffd54a };
+const GEO = {
+  belt: new THREE.BoxGeometry(0.9, 0.08, 0.9),
+  arrow: new THREE.ConeGeometry(0.16, 0.36, 3),
+  machine: new THREE.BoxGeometry(0.82, 0.6, 0.82),
+  chimney: new THREE.CylinderGeometry(0.12, 0.16, 0.4, 10),
+  gem: new THREE.OctahedronGeometry(0.2),
+  source: new THREE.CylinderGeometry(0.34, 0.42, 0.5, 14),
+  depot: new THREE.BoxGeometry(0.86, 0.7, 0.86),
+  roof: new THREE.ConeGeometry(0.66, 0.36, 4),
+  nozzle: new THREE.BoxGeometry(0.24, 0.16, 0.3),
+  item: new THREE.SphereGeometry(0.17, 12, 10),
+  itemBox: new THREE.BoxGeometry(0.26, 0.2, 0.26),
+};
+const MAT = {
+  belt: mat(0x3d4f63), arrow: new THREE.MeshBasicMaterial({ color: 0xbfe6ff }),
+  smelter: mat(0xc56a2c), smelterOn: mat(0xff8a3c, { emissive: 0x7a2a00 }),
+  assembler: mat(0x4a6fd0), assemblerOn: mat(0x6f95ff, { emissive: 0x12307a }),
+  depot: mat(0xcaa53a, { metalness: 0.4 }), roof: mat(0x8c3b3b), nozzle: mat(0xe8eef5),
+};
+for (const k of Object.keys(ITEM_COLOR)) MAT[`item-${k}`] = mat(ITEM_COLOR[k], { roughness: 0.4, metalness: k === "ingot" ? 0.7 : 0.1, emissive: k === "lamp" ? 0x665500 : 0x000000 });
+// Rotation that turns a +z-facing part toward a sim direction.
+const YAW = { up: Math.PI, right: Math.PI / 2, down: 0, left: -Math.PI / 2 };
+const shadow = (m) => { m.castShadow = true; m.receiveShadow = true; return m; };
+
+function makeBuilding(b) {
+  const g = new THREE.Group();
+  const p = board.cellToWorld(b.c, b.r);
+  g.position.set(p.x, 0, p.z);
+  g.rotation.y = YAW[b.dir];
+  const type = world.kinds[b.kind].type;
+  if (type === "belt") {
+    const base = new THREE.Mesh(GEO.belt, MAT.belt);
+    base.position.y = 0.04;
+    base.receiveShadow = true;
+    const arrow = new THREE.Mesh(GEO.arrow, MAT.arrow);
+    arrow.rotation.x = Math.PI / 2;
+    arrow.position.set(0, 0.09, 0.08);
+    arrow.scale.y = 1; arrow.scale.z = 0.25;
+    g.add(base, arrow);
+  } else if (type === "machine") {
+    const body = shadow(new THREE.Mesh(GEO.machine, MAT[b.kind] || MAT.smelter));
+    body.position.y = 0.3;
+    const top = b.kind === "smelter" ? new THREE.Mesh(GEO.chimney, MAT.roof) : new THREE.Mesh(GEO.gem, MAT["item-lamp"]);
+    top.position.y = b.kind === "smelter" ? 0.8 : 0.85;
+    const nozzle = new THREE.Mesh(GEO.nozzle, MAT.nozzle);
+    nozzle.position.set(0, 0.2, 0.46);
+    g.add(body, top, nozzle);
+    g.userData.body = body;
+    g.userData.top = top;
+  } else if (type === "source") {
+    const item = world.fixed.find((f) => f.c === b.c && f.r === b.r)?.item;
+    const body = shadow(new THREE.Mesh(GEO.source, MAT[`item-${item}`] || MAT.depot));
+    body.position.y = 0.25;
+    const nozzle = new THREE.Mesh(GEO.nozzle, MAT.nozzle);
+    nozzle.position.set(0, 0.2, 0.42);
+    g.add(body, nozzle);
+  } else {
+    g.rotation.y = 0;
+    const body = shadow(new THREE.Mesh(GEO.depot, MAT.depot));
+    body.position.y = 0.35;
+    const roof = shadow(new THREE.Mesh(GEO.roof, MAT.roof));
+    roof.position.y = 0.88;
+    roof.rotation.y = Math.PI / 4;
+    g.add(body, roof);
+  }
+  return g;
+}
+function updateBuilding(g, b, dt) {
+  if (g.userData.body) {
+    g.userData.body.material = b.active ? MAT[`${b.kind}On`] || MAT.smelterOn : MAT[b.kind] || MAT.smelter;
+    if (b.active) g.userData.top.rotation.y += dt * 4;
+  }
+}
+function makeItem(it) {
+  const m = shadow(new THREE.Mesh(it.kind === "ingot" ? GEO.itemBox : GEO.item, MAT[`item-${it.kind}`]));
+  const p = board.cellToWorld(it.c, it.r);
+  m.position.set(p.x, 0.26, p.z);
+  return m;
+}
+const buildingSync = board.createMeshSync(makeBuilding, updateBuilding);
+const itemSync = board.createMeshSync(makeItem, (m, it, dt) => { const p = board.cellToWorld(it.c, it.r); easeTo(m, p.x, 0.26, p.z, dt, 10); });
+const cursorLayer = board.createHighlightLayer({ y: 0.11, opacity: 0.5 });
+
+// --- Tools, cursor and input -> runner.push(cmd) ---
+const TOOLS = ["belt", "smelter", "assembler", "erase"];
+const TOOL_LABEL = { belt: "벨트", smelter: "제련소", assembler: "조립기", erase: "철거" };
+const DIR_ARROW = { up: "↑", right: "→", down: "↓", left: "←" };
+let tool = "belt";
+let dir = "right";
+const cursor = { c: 1, r: 3 };
+function commandAt(c, r) {
+  return tool === "erase" ? { remove: { c, r } } : { build: { kind: tool, c, r, dir } };
+}
+function act(c, r) {
+  cursor.c = c; cursor.r = r;
+  runner.push(commandAt(c, r));
+  hudDirty = true;
+}
+function selectTool(next) {
+  tool = next;
+  for (const t of TOOLS) toolBtns[t].classList.toggle("selected", t === tool);
+  hudDirty = true;
+}
+function rotate() {
+  dir = DIRS4[(DIRS4.findIndex((d) => d.name === dir) + 1) % 4].name;
+  rotateBtn.textContent = `방향 ${DIR_ARROW[dir]}`;
+  hudDirty = true;
+}
+function toggleSpeed() {
+  loop.speed = loop.speed === 1 ? 4 : 1;
+  speedBtn.textContent = `x${loop.speed}`;
+}
+function newGame() { runner.restart(); saveNote = "새 게임"; notice = ""; hudDirty = true; audio.play("cast"); }
+function moveCursor(dc, dr) {
+  cursor.c = Math.max(0, Math.min(world.grid.cols - 1, cursor.c + dc));
+  cursor.r = Math.max(0, Math.min(world.grid.rows - 1, cursor.r + dr));
+}
+
+const small = short();
+const size = small ? 44 : 50;
+const base = small ? 10 : 58;
+const gap = 6;
+const toolBtns = {};
+const TOOL_BG = { belt: "rgba(61, 79, 99, 0.95)", smelter: "rgba(197, 106, 44, 0.95)", assembler: "rgba(74, 111, 208, 0.95)", erase: "rgba(150, 50, 60, 0.95)" };
+TOOLS.forEach((t, i) => {
+  const btn = createRoundButton({ id: `tool-${t}`, label: TOOL_LABEL[t], size, fontSize: 12, background: TOOL_BG[t], onPress: () => selectTool(t) });
+  btn.classList.add("tool");
+  btn.style.left = `${12 + (i % 2) * (size + gap)}px`;
+  btn.style.bottom = `${base + (1 - Math.floor(i / 2)) * (size + gap)}px`;
+  toolBtns[t] = btn;
+});
+const rightBtn = (col, row, spec) => createRoundButton({ size, fontSize: 12, right: 12 + col * (size + gap), bottom: base + row * (size + gap), ...spec });
+const rotateBtn = rightBtn(1, 1, { id: "rotate-btn", label: "방향 →", background: "rgba(40, 110, 120, 0.95)", onPress: rotate });
+const speedBtn = rightBtn(0, 1, { id: "speed-btn", label: "x1", background: "rgba(120, 90, 30, 0.95)", onPress: toggleSpeed });
+rightBtn(1, 0, { id: "new-btn", label: "새 게임", background: "rgba(60, 90, 150, 0.95)", onPress: newGame }).style.fontSize = "11px";
+const muteBtn = rightBtn(0, 0, { id: "mute-btn", label: "🔊", background: "rgba(10, 20, 30, 0.9)" });
+bindMute(audio, muteBtn);
+selectTool("belt");
+
+bindKeys({
+  1: () => selectTool("belt"), 2: () => selectTool("smelter"), 3: () => selectTool("assembler"), 4: () => selectTool("erase"),
+  r: rotate, f: toggleSpeed, n: newGame,
+  ArrowUp: () => moveCursor(0, -1), ArrowDown: () => moveCursor(0, 1), ArrowLeft: () => moveCursor(-1, 0), ArrowRight: () => moveCursor(1, 0),
+  Enter: () => act(cursor.c, cursor.r), " ": () => act(cursor.c, cursor.r),
+  __repeat: true,
+});
+board.onCellTap((cell) => act(cell.c, cell.r));
+
+// --- HUD refresh ---
+let lastNote = "";
+function refreshHud() {
+  const s = runner.state;
+  panel.slots["coins"].textContent = `코인: ${coins(s)}`;
+  panel.slots["time"].textContent = `남은 시간: ${Math.ceil(Math.max(0, cfg.deadlineTicks - s.tick) / 60)}초`;
+  const cost = tool === "erase" ? "" : ` (${world.kinds[tool].cost}코인${tool === "belt" ? ` · ${DIR_ARROW[dir]}` : ` · 출구 ${DIR_ARROW[dir]}`})`;
+  panel.slots["tool"].textContent = `도구: ${TOOL_LABEL[tool]}${cost}`;
+  renderQuests(panel.slots["quests"], s.quests, (q) => (q.done ? "" : ` (${q.progress}/${q.target})`));
+  setSaveText(panel.slots["save-state"], runner.saveNote && runner.saveNote !== lastNote ? (saveNote = runner.saveNote) : saveNote);
+  lastNote = runner.saveNote;
+  const text = phasePanel.slots["phase-text"];
+  text.textContent = s.phase === "won" ? "주문 완료! 공방이 돌아가요 ★ 새 게임(N)"
+    : s.phase === "lost" ? "납기를 넘겼어요… 새 게임(N)"
+    : notice || "벨트로 원천→기계→창고를 이으세요";
+  text.style.color = s.phase === "lost" || notice ? "#ff9d9d" : s.phase === "won" ? "#8affc1" : "#ffe9a8";
+}
+
+installProbe({
+  runner, game, board,
+  extra: {
+    saveKey: SAVE_KEY,
+    buildings: () => listBuildings(runner.state),
+    items: () => listItems(runner.state),
+    ledger: () => itemLedger(runner.state, world),
+    coins: () => coins(runner.state),
+    ui: () => ({ tool, dir, speed: loop.speed, cursor: { ...cursor } }),
+    audio: { get muted() { return audio.muted; } },
+  },
+});
+
+const loop = startLoop({
+  runner,
+  render(dt) {
+    const s = runner.state;
+    buildingSync.sync(listBuildings(s), dt);
+    itemSync.sync(listItems(s), dt);
+    const verdict = tool === "erase" ? canRemove(s, world, { c: cursor.c, r: cursor.r }) : canBuild(s, world, { kind: tool, c: cursor.c, r: cursor.r, dir });
+    cursorLayer.set([{ c: cursor.c, r: cursor.r, color: verdict.ok ? 0x7dff9b : 0xff6b6b }]);
+    if (hudDirty || runner.saveNote !== lastNote) { refreshHud(); hudDirty = false; }
+    board.render();
+  },
+});
+</script>
+</body>
+</html>
