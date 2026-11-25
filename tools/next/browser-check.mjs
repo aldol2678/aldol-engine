@@ -234,6 +234,7 @@ async function main() {
   }
   server.close();
   const jsonPath = path.join(OUT, "logs", "browser-check.json");
+  const freshCount = results.length;
   let superseded = [];
   if (args.includes("--merge") && fs.existsSync(jsonPath)) {
     const prev = JSON.parse(fs.readFileSync(jsonPath, "utf8"));
@@ -256,9 +257,9 @@ async function main() {
   fs.mkdirSync(path.join(OUT, "logs"), { recursive: true });
   fs.writeFileSync(jsonPath, JSON.stringify(summary, null, 2) + "\n");
   const failed = results.filter((r) => r.result !== "PASS").length;
-  console.log(failed === 0 ? `BROWSER CHECK PASSED (${results.length} runs)` : `${failed} BROWSER RUN(S) FAILED of ${results.length}`);
-  const complete = engines.every(e => e.status === "RUN") && results.length === engines.length * games.length * configNames.length;
+  const complete = engines.every(e => e.status === "RUN") && freshCount === engines.length * games.length * configNames.length;
   if (!complete) console.error("Browser coverage incomplete; see engine status and result counts");
+  console.log(failed === 0 && complete ? `BROWSER CHECK PASSED (${results.length} runs)` : `BROWSER CHECK NOT PASSED: ${failed} failed, fresh coverage ${freshCount}/${engines.length * games.length * configNames.length}`);
   process.exit(failed === 0 && complete ? 0 : 1);
 }
 main();
