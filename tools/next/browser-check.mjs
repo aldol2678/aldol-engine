@@ -20,6 +20,7 @@ import path from "node:path";
 import http from "node:http";
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
+import {parseTap,expectedFishingAssets,observeGlb,correlateGlbEvidence} from "./glb-observer.mjs";
 
 const require = createRequire(import.meta.url);
 const ROOT = path.resolve(new URL("../../", import.meta.url).pathname);
@@ -30,6 +31,9 @@ const SHOTS = !args.includes("--no-shots");
 const selectedEngines = argOf("--engines","chromium,firefox,webkit").split(",");
 const firefoxProfile = argOf("--firefox-profile","default-headless");
 const settleGlb = args.includes("--settle-glb");
+const glbObserve=args.includes("--glb-observe");
+const glbContentLength=args.includes("--glb-content-length");
+let glbToken=0;
 if (!selectedEngines.length || new Set(selectedEngines).size !== selectedEngines.length ||
     selectedEngines.some(x=>!["chromium","firefox","webkit"].includes(x))) throw Error("invalid --engines");
 if (!["default-headless","headless-software","headed-software"].includes(firefoxProfile)) throw Error("invalid Firefox profile");
@@ -44,6 +48,9 @@ const CONFIGS = {
 const ALL_GAMES = ["supuli", "star-fishing", "star-defense", "rune-vault", "star-tactics", "star-foundry"];
 const games = argOf("--games", ALL_GAMES.join(",")).split(",");
 const configNames = argOf("--configs", Object.keys(CONFIGS).join(",")).split(",");
+if(glbContentLength&&!glbObserve)throw Error("content length control requires GLB observation");
+if(glbObserve&&(games.length!==1||games[0]!=="star-fishing"||selectedEngines.length!==1||selectedEngines[0]!=="chromium"))throw Error("GLB observation is scoped to Chromium Star Fishing");
+const expectedGlb=glbObserve?expectedFishingAssets(ROOT):[];
 
 // --- three.js build (CDN blocked -> local copy of the same version) ---
 function threeBuildDir() {
@@ -66,10 +73,14 @@ function startServer() {
     if (rel.endsWith("/")) rel += "index.html";
     const file = path.join(ROOT, rel);
     if (!file.startsWith(ROOT) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); res.end("not found"); return; }
-    res.writeHead(200, { "content-type": MIME[path.extname(file)] || "application/octet-stream", "cache-control": "no-store" });
+    const headers={"content-type": MIME[path.extname(file)] || "application/octet-stream", "cache-control": "no-store"};
+    const token=glbObserve&&rel.endsWith(".glb")?"glb-"+(++glbToken):null;
+    if(token){headers["x-next06-glb-id"]=token;if(glbContentLength)headers["content-length"]=fs.statSync(file).size;}
+    res.writeHead(200,headers);
+    if(glbObserve&&rel==="/src/render/vendor/GLTFLoader.js"){res.end(fs.readFileSync(file,"utf8")+"\n"+parseTap);return;}
     const stream=fs.createReadStream(file);
     if (rel.endsWith(".glb")) {
-      const entry={path:rel,started:Date.now(),size:fs.statSync(file).size,remotePort:req.socket.remotePort,finished:false,closed:false};
+      const entry={path:rel,token,started:Date.now(),size:fs.statSync(file).size,remotePort:req.socket.remotePort,finished:false,closed:false};
       serverGlbTrace.push(entry);
       res.once("finish",()=>{entry.finished=true;entry.finishAt=Date.now();entry.bytesRead=stream.bytesRead;});
       res.once("close",()=>{entry.closed=true;entry.closeAt=Date.now();entry.bytesRead=stream.bytesRead;});
@@ -163,13 +174,15 @@ async function main() {
         const requestFailures = [], glbTrace = [], navigation = [], pendingGlb = new Map();
         const serverStart = serverGlbTrace.length;
         let nav = 0, stage = "before-goto", nextRequest = 0, lastGlbEvent = Date.now();
-        const ids=new Map(), responses=new Map();
+        const ids=new Map(), responses=new Map(),responseTokens=new Map();
+        let observer=null;
+        if(glbObserve)observer=await observeGlb(context,page,()=>({nav,stage}));
         const isGlb=r=>new URL(r.url()).pathname.endsWith(".glb");
         const requestId=r=>{if(!ids.has(r))ids.set(r,++nextRequest);return ids.get(r);};
         const trace=(event,r,extra={})=>{
           if(!isGlb(r))return;
           lastGlbEvent=Date.now();
-          glbTrace.push({event,id:requestId(r),url:r.url(),at:lastGlbEvent,nav,stage,...extra});
+          glbTrace.push({event,id:requestId(r),url:r.url(),token:responseTokens.get(r)??null,at:lastGlbEvent,nav,stage,...extra});
         };
         const mark=(s)=>{stage=s;navigation.push({stage:s,nav,at:Date.now(),pendingGlb:[...pendingGlb.values()]});};
         page.on("request",r=>{if(isGlb(r)){pendingGlb.set(r,requestId(r));trace("request",r);}});
@@ -187,16 +200,17 @@ async function main() {
         page.on("pageerror", (e) => consoleErrors.push("pageerror: " + String(e.message).slice(0, 300)));
         page.on("requestfailed",r=>{
           failedRequests.push(r.url());
-          const detail={kind:"requestfailed",id:requestId(r),url:r.url(),errorText:r.failure()?.errorText||null,status:responses.get(r)??null,at:Date.now(),nav,stage};
+          const detail={kind:"requestfailed",id:requestId(r),url:r.url(),errorText:r.failure()?.errorText||null,status:responses.get(r)??null,token:responseTokens.get(r)??null,at:Date.now(),nav,stage};
           requestFailures.push(detail);trace("failed",r,detail);pendingGlb.delete(r);
         });
         page.on("response",r=>{
-          const req=r.request();responses.set(req,r.status());trace("response",req,{status:r.status()});
+          const req=r.request();responses.set(req,r.status());responseTokens.set(req,r.headers()["x-next06-glb-id"]??null);trace("response",req,{status:r.status()});
           if(r.status()>=400){failedRequests.push(`${r.status()} ${r.url()}`);requestFailures.push({kind:"http",id:requestId(req),url:r.url(),status:r.status(),at:Date.now(),nav,stage});}
         });
 
         const result = { engine: engine.name, game: gameId, config: configName, label: cfg.label, result: "FAIL", steps: [], issues: [], consoleErrors, failedRequests, requestFailures, glbTrace, navigation, firefoxProfile: engine.name==="firefox"?firefoxProfile:null, settleGlb };
         const url = `${base}/${scenario.meta.path}`;
+        async function captureDecoded(){if(observer){const doc=await observer.captureDocument(expectedGlb);ctx.expect(doc.ok,`both original GLB byte hashes and meshes decoded in navigation ${nav}`);}}
         const shot = async (tag) => {
           if (!SHOTS) return;
           const file = path.join(OUT, "captures", `${gameId}.${configName}.${tag}.png`);
@@ -251,14 +265,14 @@ async function main() {
             mark("before-reload");nav++;
             mark("reload-start");await page.reload();
             await page.waitForFunction(scenario.meta.ready,null,{timeout:30000});mark("reload-ready");
-            await settleAssetRequests();
+            await settleAssetRequests();await captureDecoded();
           },
         };
         try {
           nav++;mark("goto-start");
           await page.goto(url);
           await page.waitForFunction(scenario.meta.ready, null, { timeout: 30000 });
-          mark("goto-ready");await settleAssetRequests();
+          mark("goto-ready");await settleAssetRequests();await captureDecoded();
           await page.evaluate((key) => { localStorage.removeItem(key); localStorage.setItem("aldol-engine.audio.muted", "1"); }, scenario.meta.saveKey);
           await ctx.reload();
           const hud0 = await ctx.hud();
@@ -275,6 +289,13 @@ async function main() {
           result.hudEnd = hud1.issues;
           hudExpect("end", hud1.issues);
           await shot("end");
+          if(observer){
+            result.cdp=await observer.finish();
+            result.glbEvidence=correlateGlbEvidence(result.cdp,glbTrace,serverGlbTrace.slice(serverStart),expectedGlb);
+            ctx.expect(result.glbEvidence.decodedAllDocuments,"three complete original-byte decode snapshots");
+            ctx.expect(result.glbEvidence.correlatedAll,"six CDP/Playwright/server request tokens correlated");
+            ctx.expect(result.glbEvidence.records.every(r=>r.status===200&&r.terminal==="loadingFinished"&&r.bodyMatches),"all CDP GLB requests completed and body hashes matched");
+          }
           const realErrors = consoleErrors.filter((e) => !/favicon/.test(e));
           ctx.expect(realErrors.length === 0, `no console errors (${realErrors.length})`);
           const realFailed = failedRequests.filter((u) => !/favicon/.test(u));
@@ -284,6 +305,7 @@ async function main() {
           result.issues.push("exception: " + String(e && e.message).slice(0, 400));
           try { await shot("error"); } catch { /* page may be gone */ }
         }
+        if(observer&&!result.cdp){result.cdp=await observer.finish();result.glbEvidence=correlateGlbEvidence(result.cdp,glbTrace,serverGlbTrace.slice(serverStart),expectedGlb);}
         const verdictAt=Date.now();
         result.verdictAt=verdictAt;
         // Capture actual test verdict before intentional context teardown.
@@ -317,7 +339,7 @@ async function main() {
     three: "0.187.0 (local copy of the npm package served for the unpkg importmap URL)",
     engines: engines.map((e) => ({ name: e.name, status: e.status || "NOT RUN (browser not installed in this environment)", ...(e.error ? { error: e.error } : {}) })),
     realDevices: "NOT RUN (touch results are browser touch emulation, not real devices)",
-    firefoxProfile, settleGlb, selectedEngines,
+    firefoxProfile, settleGlb, selectedEngines,glbObserve,glbContentLength,expectedGlb,
     results,
     superseded,
   };
