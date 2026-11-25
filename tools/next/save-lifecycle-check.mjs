@@ -53,6 +53,12 @@ function traceInit(key){
       return result;
     }catch(e){log("save-write",{ok:false,error:String(e)});throw e;}
   };
+  const nativeInterval=window.setInterval;
+  window.setInterval=function(fn,delay,...args){
+    if(delay!==5000||typeof fn!=="function")return nativeInterval.call(this,fn,delay,...args);
+    log("interval-register",{delay});
+    return nativeInterval.call(this,function(...values){log("interval-fire",{delay});return fn.apply(this,values);},delay,...args);
+  };
   for(const kind of ["beforeunload","pagehide","pageshow"]){
     addEventListener(kind,e=>log(kind,{persisted:e.persisted??null}),{capture:true});
   }
@@ -107,7 +113,8 @@ try{
           row.events=await page.evaluate(()=>JSON.parse(sessionStorage.getItem("__next06_lifecycle_trace")||"[]"));
           row.oldEvents=row.events.filter(e=>e.doc===row.start.doc);
           row.restored=samePosition(row.before.player,row.after.player)&&samePosition(row.before.player,row.after.save?.player)&&shape(row.after.save);
-          row.result=row.movement&&row.shortControl&&row.restored&&!row.consoleErrors.length?"PASS":"FAIL";
+          row.intervalObserved=mode!=="interval"||row.oldEvents.some(e=>e.kind==="interval-fire"&&e.at<=row.before.at);
+          row.result=row.movement&&row.shortControl&&row.restored&&row.intervalObserved&&!row.consoleErrors.length?"PASS":"FAIL";
         }catch(e){row.error=String(e);if(page)try{row.events=await page.evaluate(()=>JSON.parse(sessionStorage.getItem("__next06_lifecycle_trace")||"[]"));}catch{}}
         finally{await context.close();}
         report.results.push(row);
