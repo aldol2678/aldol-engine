@@ -115,7 +115,16 @@ async function main() {
   console.log("engines: " + engines.map((e) => `${e.name}=${e.available ? "available" : "NOT RUN (not installed)"}`).join(" "));
 
   for (const engine of engines.filter((e) => e.available)) {
-    const browser = await engine.type.launch();
+    let browser;
+    try {
+      browser = await engine.type.launch();
+      engine.status = "RUN";
+    } catch (error) {
+      engine.status = "FAIL (browser launch)";
+      engine.error = String(error && error.message || error);
+      console.error(`FAIL ${engine.name} launch: ${engine.error}`);
+      continue;
+    }
     console.log(`browser: ${engine.name} ${browser.version()}`);
     for (const gameId of games) {
       const scenario = await import(`./play/${gameId}.mjs`);
@@ -239,8 +248,8 @@ async function main() {
   const summary = {
     tool: "tools/next/browser-check.mjs",
     three: "0.187.0 (local copy of the npm package served for the unpkg importmap URL)",
-    engines: engines.map((e) => ({ name: e.name, status: e.available ? "RUN" : "NOT RUN (browser not installed in this environment)" })),
-    realDevices: "NOT RUN (touch results are Chromium touch emulation, not real devices)",
+    engines: engines.map((e) => ({ name: e.name, status: e.status || "NOT RUN (browser not installed in this environment)", ...(e.error ? { error: e.error } : {}) })),
+    realDevices: "NOT RUN (touch results are browser touch emulation, not real devices)",
     results,
     superseded,
   };
@@ -248,6 +257,8 @@ async function main() {
   fs.writeFileSync(jsonPath, JSON.stringify(summary, null, 2) + "\n");
   const failed = results.filter((r) => r.result !== "PASS").length;
   console.log(failed === 0 ? `BROWSER CHECK PASSED (${results.length} runs)` : `${failed} BROWSER RUN(S) FAILED of ${results.length}`);
-  process.exit(failed === 0 ? 0 : 1);
+  const complete = engines.every(e => e.status === "RUN") && results.length === engines.length * games.length * configNames.length;
+  if (!complete) console.error("Browser coverage incomplete; see engine status and result counts");
+  process.exit(failed === 0 && complete ? 0 : 1);
 }
 main();
