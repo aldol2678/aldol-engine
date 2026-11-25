@@ -1,0 +1,507 @@
+{
+  "tool": "tools/next/bench.mjs",
+  "root": "/home/user/aldol-engine",
+  "node": "v22.23.5",
+  "platform": "linux x64",
+  "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+  "cpus": 4,
+  "reps": 3,
+  "gcExposed": true,
+  "rows": [
+    {
+      "name": "next/rune-vault step (moves + resets)",
+      "median_p50_us": 3.5,
+      "median_p95_us": 13.55,
+      "median_mean_us": 6.23,
+      "runs": [
+        {
+          "rep": 1,
+          "ticks": 3000,
+          "p50_us": 4.38,
+          "p95_us": 19.49,
+          "p99_us": 55.7,
+          "mean_us": 7.12,
+          "max_us": 305.83,
+          "heapUsed_mb": 4.99,
+          "heapDelta_mb": 0.47
+        },
+        {
+          "rep": 2,
+          "ticks": 3000,
+          "p50_us": 3.5,
+          "p95_us": 13.55,
+          "p99_us": 36.97,
+          "mean_us": 6.23,
+          "max_us": 2920.96,
+          "heapUsed_mb": 5.2,
+          "heapDelta_mb": 0.61
+        },
+        {
+          "rep": 3,
+          "ticks": 3000,
+          "p50_us": 3.26,
+          "p95_us": 10.72,
+          "p99_us": 29.65,
+          "mean_us": 4.28,
+          "max_us": 451.59,
+          "heapUsed_mb": 4.84,
+          "heapDelta_mb": 0.16
+        }
+      ]
+    },
+    {
+      "name": "next/star-tactics step (bot turns + enemy AI)",
+      "median_p50_us": 0.81,
+      "median_p95_us": 40.18,
+      "median_mean_us": 9.32,
+      "runs": [
+        {
+          "rep": 1,
+          "ticks": 3000,
+          "p50_us": 0.84,
+          "p95_us": 40.18,
+          "p99_us": 95.83,
+          "mean_us": 9.32,
+          "max_us": 1887.05,
+          "heapUsed_mb": 7,
+          "heapDelta_mb": 1.91
+        },
+        {
+          "rep": 2,
+          "ticks": 3000,
+          "p50_us": 0.81,
+          "p95_us": 46.52,
+          "p99_us": 110.3,
+          "mean_us": 9.78,
+          "max_us": 625.26,
+          "heapUsed_mb": 5.94,
+          "heapDelta_mb": 0.77
+        },
+        {
+          "rep": 3,
+          "ticks": 3000,
+          "p50_us": 0.5,
+          "p95_us": 30.01,
+          "p99_us": 70.61,
+          "mean_us": 6.81,
+          "max_us": 949.57,
+          "heapUsed_mb": 5.85,
+          "heapDelta_mb": 0.61
+        }
+      ]
+    },
+    {
+      "name": "next/star-foundry step (real map, working line)",
+      "median_p50_us": 2.69,
+      "median_p95_us": 6.59,
+      "median_mean_us": 3.96,
+      "runs": [
+        {
+          "rep": 1,
+          "ticks": 3000,
+          "p50_us": 3.13,
+          "p95_us": 8.2,
+          "p99_us": 33.69,
+          "mean_us": 4.57,
+          "max_us": 319.7,
+          "heapUsed_mb": 5.57,
+          "heapDelta_mb": 0.17
+        },
+        {
+          "rep": 2,
+          "ticks": 3000,
+          "p50_us": 2.69,
+          "p95_us": 6.59,
+          "p99_us": 24.21,
+          "mean_us": 3.96,
+          "max_us": 821.34,
+          "heapUsed_mb": 7.13,
+          "heapDelta_mb": 1.67
+        },
+        {
+          "rep": 3,
+          "ticks": 3000,
+          "p50_us": 2.07,
+          "p95_us": 5.4,
+          "p99_us": 12.3,
+          "mean_us": 2.89,
+          "max_us": 155.86,
+          "heapUsed_mb": 7.5,
+          "heapDelta_mb": 2
+        }
+      ]
+    },
+    {
+      "name": "next/star-foundry load ~100 entities",
+      "median_p50_us": 6.75,
+      "median_p95_us": 22.84,
+      "median_mean_us": 9.76,
+      "runs": [
+        {
+          "rep": 1,
+          "ticks": 2000,
+          "p50_us": 6.85,
+          "p95_us": 34.79,
+          "p99_us": 87.26,
+          "mean_us": 12.84,
+          "max_us": 353.02,
+          "heapUsed_mb": 7.32,
+          "heapDelta_mb": 1.67
+        },
+        {
+          "rep": 2,
+          "ticks": 2000,
+          "p50_us": 6.69,
+          "p95_us": 22.74,
+          "p99_us": 47.45,
+          "mean_us": 9.76,
+          "max_us": 830.6,
+          "heapUsed_mb": 7.34,
+          "heapDelta_mb": 1.68
+        },
+        {
+          "rep": 3,
+          "ticks": 2000,
+          "p50_us": 6.75,
+          "p95_us": 22.84,
+          "p99_us": 35.33,
+          "mean_us": 9.38,
+          "max_us": 274.85,
+          "heapUsed_mb": 7.35,
+          "heapDelta_mb": 1.69
+        }
+      ],
+      "entities": 99
+    },
+    {
+      "name": "next/star-foundry load ~500 entities",
+      "median_p50_us": 11.76,
+      "median_p95_us": 144.38,
+      "median_mean_us": 24.63,
+      "runs": [
+        {
+          "rep": 1,
+          "ticks": 2000,
+          "p50_us": 12.82,
+          "p95_us": 155.51,
+          "p99_us": 288.56,
+          "mean_us": 31.96,
+          "max_us": 676.22,
+          "heapUsed_mb": 8.8,
+          "heapDelta_mb": 3.03
+        },
+        {
+          "rep": 2,
+          "ticks": 2000,
+          "p50_us": 11.68,
+          "p95_us": 142.57,
+          "p99_us": 167.6,
+          "mean_us": 24.17,
+          "max_us": 288.33,
+          "heapUsed_mb": 8.94,
+          "heapDelta_mb": 3.16
+        },
+        {
+          "rep": 3,
+          "ticks": 2000,
+          "p50_us": 11.76,
+          "p95_us": 144.38,
+          "p99_us": 170.71,
+          "mean_us": 24.63,
+          "max_us": 367.51,
+          "heapUsed_mb": 8.97,
+          "heapDelta_mb": 3.16
+        }
+      ],
+      "entities": 499
+    },
+    {
+      "name": "next/star-foundry load ~1000 entities",
+      "median_p50_us": 17.32,
+      "median_p95_us": 288.37,
+      "median_mean_us": 42.99,
+      "runs": [
+        {
+          "rep": 1,
+          "ticks": 2000,
+          "p50_us": 17.23,
+          "p95_us": 286.41,
+          "p99_us": 341.34,
+          "mean_us": 42.99,
+          "max_us": 661.66,
+          "heapUsed_mb": 9.4,
+          "heapDelta_mb": 3.52
+        },
+        {
+          "rep": 2,
+          "ticks": 2000,
+          "p50_us": 17.39,
+          "p95_us": 296.8,
+          "p99_us": 362.18,
+          "mean_us": 43.44,
+          "max_us": 713.91,
+          "heapUsed_mb": 9.42,
+          "heapDelta_mb": 3.52
+        },
+        {
+          "rep": 3,
+          "ticks": 2000,
+          "p50_us": 17.32,
+          "p95_us": 288.37,
+          "p99_us": 339.05,
+          "mean_us": 42.29,
+          "max_us": 436.86,
+          "heapUsed_mb": 9.42,
+          "heapDelta_mb": 3.52
+        }
+      ],
+      "entities": 999
+    },
+    {
+      "name": "next/ecs 100 entities: move system + query + events",
+      "median_p50_us": 5.56,
+      "median_p95_us": 8.23,
+      "median_mean_us": 6.44,
+      "runs": [
+        {
+          "rep": 1,
+          "ticks": 3000,
+          "p50_us": 5.62,
+          "p95_us": 7.86,
+          "p99_us": 27.97,
+          "mean_us": 6.42,
+          "max_us": 128.79,
+          "heapUsed_mb": 9.65,
+          "heapDelta_mb": 3.88
+        },
+        {
+          "rep": 2,
+          "ticks": 3000,
+          "p50_us": 5.56,
+          "p95_us": 8.59,
+          "p99_us": 32.38,
+          "mean_us": 6.55,
+          "max_us": 185.68,
+          "heapUsed_mb": 9.69,
+          "heapDelta_mb": 3.89
+        },
+        {
+          "rep": 3,
+          "ticks": 3000,
+          "p50_us": 5.45,
+          "p95_us": 8.23,
+          "p99_us": 31.93,
+          "mean_us": 6.44,
+          "max_us": 112.65,
+          "heapUsed_mb": 9.64,
+          "heapDelta_mb": 3.83
+        }
+      ]
+    },
+    {
+      "name": "next/ecs 100 entities: stateHash (per call)",
+      "median_p50_us": 71.73,
+      "median_p95_us": 226.2,
+      "median_mean_us": 97.68,
+      "runs": [
+        {
+          "rep": 1,
+          "ticks": 200,
+          "p50_us": 113.9,
+          "p95_us": 272.96,
+          "p99_us": 503.88,
+          "mean_us": 139.59,
+          "max_us": 1525.28,
+          "heapUsed_mb": 9.16,
+          "heapDelta_mb": 3.38
+        },
+        {
+          "rep": 2,
+          "ticks": 200,
+          "p50_us": 71.73,
+          "p95_us": 226.2,
+          "p99_us": 304.85,
+          "mean_us": 97.68,
+          "max_us": 308.23,
+          "heapUsed_mb": 9.07,
+          "heapDelta_mb": 3.27
+        },
+        {
+          "rep": 3,
+          "ticks": 200,
+          "p50_us": 70.35,
+          "p95_us": 170.59,
+          "p99_us": 307.86,
+          "mean_us": 94.38,
+          "max_us": 535.75,
+          "heapUsed_mb": 9.06,
+          "heapDelta_mb": 3.25
+        }
+      ]
+    },
+    {
+      "name": "next/ecs 500 entities: move system + query + events",
+      "median_p50_us": 33.44,
+      "median_p95_us": 60.42,
+      "median_mean_us": 38.19,
+      "runs": [
+        {
+          "rep": 1,
+          "ticks": 3000,
+          "p50_us": 34.2,
+          "p95_us": 61.97,
+          "p99_us": 165.01,
+          "mean_us": 40.2,
+          "max_us": 1142.8,
+          "heapUsed_mb": 7.76,
+          "heapDelta_mb": 1.89
+        },
+        {
+          "rep": 2,
+          "ticks": 3000,
+          "p50_us": 33.19,
+          "p95_us": 59.96,
+          "p99_us": 129.46,
+          "mean_us": 38.19,
+          "max_us": 670.59,
+          "heapUsed_mb": 11.63,
+          "heapDelta_mb": 5.69
+        },
+        {
+          "rep": 3,
+          "ticks": 3000,
+          "p50_us": 33.44,
+          "p95_us": 60.42,
+          "p99_us": 110.2,
+          "mean_us": 37.86,
+          "max_us": 900.98,
+          "heapUsed_mb": 7.78,
+          "heapDelta_mb": 1.85
+        }
+      ]
+    },
+    {
+      "name": "next/ecs 500 entities: stateHash (per call)",
+      "median_p50_us": 368.2,
+      "median_p95_us": 532.18,
+      "median_mean_us": 385.75,
+      "runs": [
+        {
+          "rep": 1,
+          "ticks": 200,
+          "p50_us": 368.2,
+          "p95_us": 532.18,
+          "p99_us": 648.36,
+          "mean_us": 385.75,
+          "max_us": 782.48,
+          "heapUsed_mb": 12.95,
+          "heapDelta_mb": 7.05
+        },
+        {
+          "rep": 2,
+          "ticks": 200,
+          "p50_us": 367.88,
+          "p95_us": 513.66,
+          "p99_us": 553.2,
+          "mean_us": 378.18,
+          "max_us": 569.84,
+          "heapUsed_mb": 12.95,
+          "heapDelta_mb": 6.99
+        },
+        {
+          "rep": 3,
+          "ticks": 200,
+          "p50_us": 370.41,
+          "p95_us": 534.11,
+          "p99_us": 653.88,
+          "mean_us": 386.6,
+          "max_us": 935.82,
+          "heapUsed_mb": 12.95,
+          "heapDelta_mb": 6.99
+        }
+      ]
+    },
+    {
+      "name": "next/ecs 1000 entities: move system + query + events",
+      "median_p50_us": 71.64,
+      "median_p95_us": 107.17,
+      "median_mean_us": 80.64,
+      "runs": [
+        {
+          "rep": 1,
+          "ticks": 3000,
+          "p50_us": 71.28,
+          "p95_us": 105.75,
+          "p99_us": 211.77,
+          "mean_us": 78.9,
+          "max_us": 390.91,
+          "heapUsed_mb": 12.37,
+          "heapDelta_mb": 6.35
+        },
+        {
+          "rep": 2,
+          "ticks": 3000,
+          "p50_us": 71.64,
+          "p95_us": 107.17,
+          "p99_us": 198.5,
+          "mean_us": 80.64,
+          "max_us": 420.38,
+          "heapUsed_mb": 12.45,
+          "heapDelta_mb": 6.4
+        },
+        {
+          "rep": 3,
+          "ticks": 3000,
+          "p50_us": 72.24,
+          "p95_us": 110.84,
+          "p99_us": 207.94,
+          "mean_us": 82.48,
+          "max_us": 1624.86,
+          "heapUsed_mb": 12.45,
+          "heapDelta_mb": 6.4
+        }
+      ]
+    },
+    {
+      "name": "next/ecs 1000 entities: stateHash (per call)",
+      "median_p50_us": 712.97,
+      "median_p95_us": 992.04,
+      "median_mean_us": 755.14,
+      "runs": [
+        {
+          "rep": 1,
+          "ticks": 200,
+          "p50_us": 747.07,
+          "p95_us": 1400.34,
+          "p99_us": 1630.13,
+          "mean_us": 819.59,
+          "max_us": 1725.71,
+          "heapUsed_mb": 12.54,
+          "heapDelta_mb": 6.6
+        },
+        {
+          "rep": 2,
+          "ticks": 200,
+          "p50_us": 712.56,
+          "p95_us": 992.04,
+          "p99_us": 1340.06,
+          "mean_us": 755.14,
+          "max_us": 1422.29,
+          "heapUsed_mb": 19.81,
+          "heapDelta_mb": 13.86
+        },
+        {
+          "rep": 3,
+          "ticks": 200,
+          "p50_us": 712.97,
+          "p95_us": 975.39,
+          "p99_us": 1169.8,
+          "mean_us": 746.59,
+          "max_us": 1301.13,
+          "heapUsed_mb": 19.81,
+          "heapDelta_mb": 13.86
+        }
+      ]
+    }
+  ]
+}

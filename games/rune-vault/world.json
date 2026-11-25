@@ -1,0 +1,444 @@
+{
+  "schemaVersion": "worldforge/0.1",
+  "project": {
+    "id": "rune-vault",
+    "name": "룬 금고"
+  },
+  "world": {
+    "id": "rune-vault-rooms",
+    "name": "룬 금고",
+    "version": "0.1.0",
+    "description": "M4 후보 — 상자·발판·레버·열쇠로 금고 방 3개를 통과하는 탑다운 퍼즐 탐험"
+  },
+  "assets": [
+    {
+      "id": "explorer",
+      "type": "model",
+      "uri": "builtin:explorer"
+    },
+    {
+      "id": "crate",
+      "type": "model",
+      "uri": "builtin:crate"
+    },
+    {
+      "id": "door",
+      "type": "model",
+      "uri": "builtin:door"
+    },
+    {
+      "id": "plate",
+      "type": "model",
+      "uri": "builtin:plate"
+    },
+    {
+      "id": "lever",
+      "type": "model",
+      "uri": "builtin:lever"
+    },
+    {
+      "id": "key",
+      "type": "model",
+      "uri": "builtin:key"
+    },
+    {
+      "id": "goal",
+      "type": "model",
+      "uri": "builtin:goal"
+    },
+    {
+      "id": "wall",
+      "type": "model",
+      "uri": "builtin:wall"
+    }
+  ],
+  "zones": [
+    {
+      "id": "vault",
+      "name": "룬 금고",
+      "type": "zone.vault",
+      "geometry": {
+        "type": "polygon",
+        "space": "local",
+        "points": [
+          [
+            0,
+            0
+          ],
+          [
+            10,
+            0
+          ],
+          [
+            10,
+            6
+          ],
+          [
+            0,
+            6
+          ]
+        ]
+      }
+    }
+  ],
+  "places": [
+    {
+      "id": "spawn",
+      "name": "금고 입구",
+      "type": "place.spawn",
+      "zoneId": "vault",
+      "position": [
+        1,
+        0,
+        1
+      ]
+    }
+  ],
+  "paths": [],
+  "entities": [
+    {
+      "id": "ent-explorer",
+      "name": "탐험가",
+      "type": "entity.player",
+      "assetId": "explorer",
+      "enabled": true,
+      "parentId": null,
+      "tags": [
+        "player"
+      ],
+      "components": {},
+      "transform": {
+        "position": [
+          1,
+          0,
+          1
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      }
+    }
+  ],
+  "npcs": [],
+  "events": [],
+  "quests": [
+    {
+      "id": "escape-first-room",
+      "name": "첫 방 탈출하기",
+      "type": "quest.room",
+      "nodes": [
+        {
+          "id": "start",
+          "type": "quest.start"
+        },
+        {
+          "id": "cond-1",
+          "type": "quest.condition",
+          "params": {
+            "stat": "roomsCleared",
+            "op": ">=",
+            "value": 1
+          }
+        },
+        {
+          "id": "done",
+          "type": "quest.complete",
+          "params": {
+            "reward": {
+              "items": {
+                "rune": 1
+              }
+            }
+          }
+        }
+      ],
+      "edges": [
+        {
+          "from": "start",
+          "to": "cond-1"
+        },
+        {
+          "from": "cond-1",
+          "to": "done"
+        }
+      ]
+    },
+    {
+      "id": "use-a-key",
+      "name": "열쇠로 봉인 풀기",
+      "type": "quest.key",
+      "nodes": [
+        {
+          "id": "start",
+          "type": "quest.start"
+        },
+        {
+          "id": "cond-1",
+          "type": "quest.condition",
+          "params": {
+            "stat": "keysUsed",
+            "op": ">=",
+            "value": 1
+          }
+        },
+        {
+          "id": "done",
+          "type": "quest.complete",
+          "params": {
+            "reward": {
+              "items": {
+                "rune": 1
+              }
+            }
+          }
+        }
+      ],
+      "edges": [
+        {
+          "from": "start",
+          "to": "cond-1"
+        },
+        {
+          "from": "cond-1",
+          "to": "done"
+        }
+      ]
+    },
+    {
+      "id": "clear-the-vault",
+      "name": "금고 방 3개 통과하기",
+      "type": "quest.room",
+      "nodes": [
+        {
+          "id": "start",
+          "type": "quest.start"
+        },
+        {
+          "id": "cond-1",
+          "type": "quest.condition",
+          "params": {
+            "stat": "roomsCleared",
+            "op": ">=",
+            "value": 3
+          }
+        },
+        {
+          "id": "done",
+          "type": "quest.complete",
+          "params": {
+            "reward": {
+              "items": {
+                "rune": 2
+              }
+            }
+          }
+        }
+      ],
+      "edges": [
+        {
+          "from": "start",
+          "to": "cond-1"
+        },
+        {
+          "from": "cond-1",
+          "to": "done"
+        }
+      ]
+    },
+    {
+      "id": "flawless",
+      "name": "실패 없이 금고 통과하기",
+      "type": "quest.limit",
+      "nodes": [
+        {
+          "id": "start",
+          "type": "quest.start"
+        },
+        {
+          "id": "cond-1",
+          "type": "quest.condition",
+          "params": {
+            "stat": "roomsCleared",
+            "op": ">=",
+            "value": 3
+          }
+        },
+        {
+          "id": "cond-2",
+          "type": "quest.condition",
+          "params": {
+            "stat": "fails",
+            "op": "<=",
+            "value": 0
+          }
+        },
+        {
+          "id": "done",
+          "type": "quest.complete",
+          "params": {
+            "reward": {
+              "items": {
+                "rune": 1
+              }
+            }
+          }
+        }
+      ],
+      "edges": [
+        {
+          "from": "start",
+          "to": "cond-1"
+        },
+        {
+          "from": "cond-1",
+          "to": "cond-2"
+        },
+        {
+          "from": "cond-2",
+          "to": "done"
+        }
+      ]
+    }
+  ],
+  "rules": [
+    {
+      "id": "rule-puzzle",
+      "name": "룬 금고 퍼즐 규칙",
+      "type": "game.puzzle",
+      "enabled": true,
+      "config": {
+        "board": {
+          "cols": 11,
+          "rows": 7
+        },
+        "clearDelayTicks": 45,
+        "keyCapacity": 3,
+        "levels": [
+          {
+            "id": "room-1",
+            "name": "입구 방",
+            "moveLimit": 20,
+            "rows": [
+              "###########",
+              "#P.C.#....#",
+              "#....#....#",
+              "#.........#",
+              "#....#....#",
+              "#....#...G#",
+              "###########"
+            ],
+            "objects": [
+              {
+                "kind": "door",
+                "id": "gate",
+                "c": 5,
+                "r": 3
+              },
+              {
+                "kind": "plate",
+                "c": 4,
+                "r": 1,
+                "door": "gate"
+              }
+            ]
+          },
+          {
+            "id": "room-2",
+            "name": "열쇠 방",
+            "moveLimit": 36,
+            "rows": [
+              "###########",
+              "#P....#..G#",
+              "#.###.#.###",
+              "#.#K#.....#",
+              "#.#.###.#.#",
+              "#.........#",
+              "###########"
+            ],
+            "objects": [
+              {
+                "kind": "door",
+                "id": "cell",
+                "c": 3,
+                "r": 4
+              },
+              {
+                "kind": "lever",
+                "c": 5,
+                "r": 1,
+                "door": "cell"
+              },
+              {
+                "kind": "lock",
+                "id": "seal",
+                "c": 7,
+                "r": 2
+              }
+            ]
+          },
+          {
+            "id": "room-3",
+            "name": "금고 심장",
+            "moveLimit": 48,
+            "rows": [
+              "###########",
+              "#P..#.....#",
+              "#.C.#.###.#",
+              "#.....#K#.#",
+              "#.C.#.#.###",
+              "#...#....G#",
+              "###########"
+            ],
+            "objects": [
+              {
+                "kind": "door",
+                "id": "twin",
+                "c": 4,
+                "r": 3,
+                "mode": "all"
+              },
+              {
+                "kind": "plate",
+                "c": 3,
+                "r": 1,
+                "door": "twin"
+              },
+              {
+                "kind": "plate",
+                "c": 1,
+                "r": 5,
+                "door": "twin"
+              },
+              {
+                "kind": "door",
+                "id": "cell",
+                "c": 7,
+                "r": 4
+              },
+              {
+                "kind": "lever",
+                "c": 9,
+                "r": 3,
+                "door": "cell"
+              },
+              {
+                "kind": "lock",
+                "id": "seal",
+                "c": 8,
+                "r": 5
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
